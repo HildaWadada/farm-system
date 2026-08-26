@@ -1,0 +1,138 @@
+import uuid
+from datetime import datetime
+from decimal import Decimal
+from typing import Optional
+from pydantic import BaseModel, EmailStr
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    role: str
+    name: str
+    must_change_password: bool
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class UserOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    email: EmailStr
+    role: str
+
+    class Config:
+        from_attributes = True
+
+
+class WorkerCreate(BaseModel):
+    name: str
+    phone: Optional[str] = None
+    role: Optional[str] = None
+
+
+class WorkerOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    phone: Optional[str]
+    role: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ActivityCreate(BaseModel):
+    activity_type: str  # spray | weed | irrigate | fertilize | harvest | issue
+    crop: str           # dragon_fruit | citrus | hass_avocado | chilli
+    worker_id: Optional[uuid.UUID] = None
+    quantity_kg: Optional[Decimal] = None  # only meaningful when activity_type == "harvest"
+    notes: Optional[str] = None
+
+
+class ActivityOut(BaseModel):
+    id: uuid.UUID
+    activity_type: str
+    crop: str
+    block: Optional[str]
+    quantity_kg: Optional[Decimal]
+    notes: Optional[str]
+    created_at: datetime
+    worker: Optional[WorkerOut] = None
+
+    class Config:
+        from_attributes = True
+
+
+class WorkerDetail(WorkerOut):
+    activities: list[ActivityOut] = []
+
+
+class AlertOut(BaseModel):
+    id: uuid.UUID
+    activity_id: uuid.UUID
+    status: str
+    resolution_note: Optional[str]
+    created_at: datetime
+    activity: ActivityOut
+
+    class Config:
+        from_attributes = True
+
+
+class HomeSummary(BaseModel):
+    today_entries: int
+    active_alerts: int
+    pending_sync: int
+
+
+class BuyerCreate(BaseModel):
+    name: str
+    phone: Optional[str] = None
+
+
+class BuyerOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    phone: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class OrderCreate(BaseModel):
+    buyer_id: uuid.UUID
+    crop: str
+    quantity_kg: Decimal
+    price: Decimal
+
+
+class OrderStatusUpdate(BaseModel):
+    status: str  # pending | paid | cancelled
+
+
+class OrderOut(BaseModel):
+    id: uuid.UUID
+    crop: str
+    quantity_kg: Decimal
+    price: Decimal
+    status: str
+    created_at: datetime
+    buyer: BuyerOut
+
+    class Config:
+        from_attributes = True
+
+
+class LiveStockItem(BaseModel):
+    crop: str
+    available_kg: Decimal

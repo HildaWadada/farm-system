@@ -1,0 +1,20 @@
+# ── Secrets — never commit these ──
+backend/.env
+frontend/.env.local
+
+# ── Backend (Python) ──
+backend/.venv/
+backend/venv/
+backend/__pycache__/
+backend/app/__pycache__/
+*.pyc
+
+# ── Frontend (Next.js) ──
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/npm-debug.log*
+
+# ── OS / editor clutter ──
+.DS_Store
+Thumbs.db

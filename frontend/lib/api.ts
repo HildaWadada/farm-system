@@ -1,0 +1,324 @@
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+export type LoginResponse = {
+  access_token: string;
+  token_type: string;
+  role: "owner" | "supervisor";
+  name: string;
+  must_change_password: boolean;
+};
+
+export async function login(email: string, password: string): Promise<LoginResponse> {
+  const res = await fetch(`${API_URL}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Incorrect email or password");
+  }
+
+  return res.json();
+}
+
+export type Worker = {
+  id: string;
+  name: string;
+  phone: string | null;
+  role: string | null;
+  created_at: string;
+};
+
+export type Activity = {
+  id: string;
+  activity_type: string;
+  crop: string;
+  block: string | null;
+  quantity_kg: string | null;
+  notes: string | null;
+  created_at: string;
+  worker: Worker | null;
+};
+
+export type WorkerDetail = Worker & { activities: Activity[] };
+
+export async function createWorker(
+  token: string,
+  data: { name: string; phone?: string; role?: string }
+): Promise<Worker> {
+  const res = await fetch(`${API_URL}/workers`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not add worker");
+  }
+
+  return res.json();
+}
+
+export async function listWorkers(token: string): Promise<Worker[]> {
+  const res = await fetch(`${API_URL}/workers`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Could not load workers");
+  }
+
+  return res.json();
+}
+
+export async function getWorker(token: string, workerId: string): Promise<WorkerDetail> {
+  const res = await fetch(`${API_URL}/workers/${workerId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Could not load worker");
+  }
+
+  return res.json();
+}
+
+export async function createActivity(
+  token: string,
+  data: {
+    activity_type: string;
+    crop: string;
+    worker_id?: string;
+    quantity_kg?: number;
+    notes?: string;
+  }
+): Promise<Activity> {
+  const res = await fetch(`${API_URL}/activities`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not save entry");
+  }
+
+  return res.json();
+}
+
+export async function listActivities(token: string): Promise<Activity[]> {
+  const res = await fetch(`${API_URL}/activities`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Could not load activity feed");
+  }
+
+  return res.json();
+}
+
+export type Summary = {
+  today_entries: number;
+  active_alerts: number;
+  pending_sync: number;
+};
+
+export async function getSummary(token: string): Promise<Summary> {
+  const res = await fetch(`${API_URL}/summary`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Could not load summary");
+  }
+
+  return res.json();
+}
+
+export type Alert = {
+  id: string;
+  activity_id: string;
+  status: "open" | "resolved";
+  resolution_note: string | null;
+  created_at: string;
+  activity: Activity;
+};
+
+export async function listAlerts(token: string): Promise<Alert[]> {
+  const res = await fetch(`${API_URL}/alerts`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Could not load alerts");
+  }
+
+  return res.json();
+}
+
+export async function resolveAlert(token: string, alertId: string): Promise<Alert> {
+  const res = await fetch(`${API_URL}/alerts/${alertId}/resolve`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not resolve alert");
+  }
+
+  return res.json();
+}
+
+export async function changePassword(
+  token: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<void> {
+  const res = await fetch(`${API_URL}/auth/change-password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not change password");
+  }
+}
+
+export type Buyer = {
+  id: string;
+  name: string;
+  phone: string | null;
+  created_at: string;
+};
+
+export async function createBuyer(
+  token: string,
+  data: { name: string; phone?: string }
+): Promise<Buyer> {
+  const res = await fetch(`${API_URL}/buyers`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not add buyer");
+  }
+
+  return res.json();
+}
+
+export async function listBuyers(token: string): Promise<Buyer[]> {
+  const res = await fetch(`${API_URL}/buyers`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Could not load buyers");
+  }
+
+  return res.json();
+}
+
+export type LiveStockItem = {
+  crop: string;
+  available_kg: string;
+};
+
+export async function getLiveStock(token: string): Promise<LiveStockItem[]> {
+  const res = await fetch(`${API_URL}/live-stock`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Could not load live stock");
+  }
+
+  return res.json();
+}
+
+export type Order = {
+  id: string;
+  crop: string;
+  quantity_kg: string;
+  price: string;
+  status: "pending" | "paid" | "cancelled";
+  created_at: string;
+  buyer: Buyer;
+};
+
+export async function createOrder(
+  token: string,
+  data: { buyer_id: string; crop: string; quantity_kg: number; price: number }
+): Promise<Order> {
+  const res = await fetch(`${API_URL}/orders`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not save order");
+  }
+
+  return res.json();
+}
+
+export async function listOrders(token: string): Promise<Order[]> {
+  const res = await fetch(`${API_URL}/orders`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Could not load orders");
+  }
+
+  return res.json();
+}
+
+export async function updateOrderStatus(
+  token: string,
+  orderId: string,
+  newStatus: "pending" | "paid" | "cancelled"
+): Promise<Order> {
+  const res = await fetch(`${API_URL}/orders/${orderId}/status`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ status: newStatus }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not update order");
+  }
+
+  return res.json();
+}
