@@ -79,23 +79,6 @@ pip install -r requirements.txt
 
 Create `.env` in `backend/` (copy `.env.example` and fill in real values):
 
-```
-DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/farm_system
-JWT_SECRET=some-long-random-string
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=480
-
-OWNER_NAME=Cliff Nakitare
-OWNER_EMAIL=owner@example.com
-OWNER_TEMP_PASSWORD=ChangeMe123
-
-SUPERVISOR_NAME=Tinega Lydia
-SUPERVISOR_EMAIL=supervisor@example.com
-SUPERVISOR_TEMP_PASSWORD=ChangeMe1234
-```
-
-Create the two accounts (only ever needs to run once):
-
 ```bash
 python seed.py
 ```
