@@ -41,12 +41,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#FBF8F2] px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#2F5233] mb-4">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FBF8F2" strokeWidth="2">
-              <path d="M12 2v20M12 2C8 6 4 8 4 13a8 8 0 0016 0c0-5-4-7-8-11z" />
-            </svg>
-          </div>
-          <h1 className="text-xl font-semibold text-[#2A2420]">Farm platform</h1>
+          <h1 className="text-xl font-semibold text-[#2A2420]">Welcome to Cliff's Farm</h1>
           <p className="text-sm text-[#8A8175] mt-1">Sign in to your account</p>
         </div>
 
@@ -95,9 +90,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-xs text-[#B0A99B] mt-6">
-          Accounts are created by your administrator — there is no self sign-up.
-        </p>
+      
       </div>
     </div>
   );

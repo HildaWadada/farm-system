@@ -5,8 +5,8 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";  -- for gen_random_uuid()
 
 CREATE TYPE user_role AS ENUM ('owner', 'supervisor');
-CREATE TYPE activity_type AS ENUM ('spray', 'weed', 'irrigate', 'fertilize', 'harvest', 'issue');
-CREATE TYPE crop_type AS ENUM ('dragon_fruit', 'citrus', 'hass_avocado', 'chilli');
+CREATE TYPE activity_type AS ENUM ('spray', 'weed', 'irrigate', 'fertilize', 'harvest', 'issue', 'other');
+CREATE TYPE crop_type AS ENUM ('dragon_fruit', 'citrus', 'hass_avocado', 'chilli', 'other');
 CREATE TYPE order_status AS ENUM ('pending', 'paid', 'cancelled');
 CREATE TYPE alert_status AS ENUM ('open', 'resolved');
 
@@ -44,7 +44,9 @@ CREATE TABLE activities (
     logged_by       UUID NOT NULL REFERENCES users(id),   -- always the supervisor's account
     worker_id       UUID REFERENCES workers(id),           -- the worker who performed the activity
     activity_type   activity_type NOT NULL,
+    activity_type_other TEXT,                              -- free text when activity_type = 'other'
     crop            crop_type NOT NULL,
+    crop_other      TEXT,                                  -- free text when crop = 'other'
     block           TEXT,                                  -- e.g. "C2"
     quantity_kg     NUMERIC(10,2),                          -- relevant mainly for harvest
     photo_url       TEXT,
@@ -77,6 +79,7 @@ CREATE TABLE buyers (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name        TEXT NOT NULL,
     phone       TEXT,
+    category    TEXT,                                    -- e.g. "Retailer", "Wholesaler", "Restaurant"
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -84,14 +87,18 @@ CREATE TABLE buyers (
 -- Orders: a sale. Always created by the supervisor against live stock.
 -- ─────────────────────────────────────────────
 CREATE TABLE orders (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    buyer_id    UUID NOT NULL REFERENCES buyers(id),
-    crop        crop_type NOT NULL,
-    quantity_kg NUMERIC(10,2) NOT NULL,
-    price       NUMERIC(12,2) NOT NULL,
-    status      order_status NOT NULL DEFAULT 'pending',
-    logged_by   UUID NOT NULL REFERENCES users(id),   -- always the supervisor
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    buyer_id        UUID NOT NULL REFERENCES buyers(id),
+    crop            crop_type NOT NULL,
+    quantity_kg     NUMERIC(10,2) NOT NULL,
+    price           NUMERIC(12,2) NOT NULL,                -- subtotal, before fees/tax
+    logistics_fee   NUMERIC(12,2) NOT NULL DEFAULT 0,
+    tax             NUMERIC(12,2) NOT NULL DEFAULT 0,
+    notify_sms      BOOLEAN NOT NULL DEFAULT FALSE,         -- preference only — no SMS provider connected yet
+    notify_email    BOOLEAN NOT NULL DEFAULT FALSE,         -- preference only — no email provider connected yet
+    status          order_status NOT NULL DEFAULT 'pending',
+    logged_by       UUID NOT NULL REFERENCES users(id),     -- always the supervisor
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_orders_status ON orders(status);

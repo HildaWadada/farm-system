@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireAuth } from "@/lib/useRequireAuth";
-import { createActivity, listActivities, listWorkers, createWorker, Activity, Worker } from "@/lib/api";
+import { createActivity, listWorkers, createWorker, Worker } from "@/lib/api";
 
 const CROPS = [
   { value: "dragon_fruit", label: "Dragon fruit" },
   { value: "citrus", label: "Citrus" },
   { value: "hass_avocado", label: "Hass avocado" },
   { value: "chilli", label: "Chilli" },
+  { value: "other", label: "Other" },
 ];
 
 const ACTIVITIES = [
@@ -19,26 +20,24 @@ const ACTIVITIES = [
   { value: "irrigate", label: "Irrigate" },
   { value: "fertilize", label: "Fertilize" },
   { value: "issue", label: "Issue" },
+  { value: "other", label: "Other" },
 ];
 
-function labelFor(list: typeof CROPS, value: string) {
-  return list.find((x) => x.value === value)?.label ?? value;
-}
+
 
 export default function EntryPage() {
   const router = useRouter();
   const { ready, token, name } = useRequireAuth("supervisor");
 
   const [crop, setCrop] = useState("citrus");
+  const [cropOther, setCropOther] = useState("");
   const [activityType, setActivityType] = useState("harvest");
+  const [activityTypeOther, setActivityTypeOther] = useState("");
   const [notes, setNotes] = useState("");
   const [quantityKg, setQuantityKg] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-
-  const [feed, setFeed] = useState<Activity[]>([]);
-  const [feedLoading, setFeedLoading] = useState(true);
 
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [workerId, setWorkerId] = useState<string>("");
@@ -47,18 +46,6 @@ export default function EntryPage() {
   const [newWorkerPhone, setNewWorkerPhone] = useState("");
   const [newWorkerRole, setNewWorkerRole] = useState("");
   const [savingWorker, setSavingWorker] = useState(false);
-
-  async function loadFeed(t: string) {
-    setFeedLoading(true);
-    try {
-      const items = await listActivities(t);
-      setFeed(items);
-    } catch {
-      // silently ignore — feed is secondary to the entry form
-    } finally {
-      setFeedLoading(false);
-    }
-  }
 
   async function loadWorkers(t: string) {
     try {
@@ -71,7 +58,6 @@ export default function EntryPage() {
 
   useEffect(() => {
     if (ready && token) {
-      loadFeed(token);
       loadWorkers(token);
     }
   }, [ready, token]);
@@ -102,12 +88,24 @@ export default function EntryPage() {
     if (!token) return;
     setError(null);
     setSuccess(false);
+
+    if (crop === "other" && !cropOther.trim()) {
+      setError("Type the crop name for \"Other\".");
+      return;
+    }
+    if (activityType === "other" && !activityTypeOther.trim()) {
+      setError("Type the activity name for \"Other\".");
+      return;
+    }
+
     setSaving(true);
 
     try {
       await createActivity(token, {
         activity_type: activityType,
+        activity_type_other: activityType === "other" ? activityTypeOther.trim() : undefined,
         crop,
+        crop_other: crop === "other" ? cropOther.trim() : undefined,
         worker_id: workerId || undefined,
         notes: notes || undefined,
         quantity_kg: activityType === "harvest" && quantityKg ? Number(quantityKg) : undefined,
@@ -115,7 +113,8 @@ export default function EntryPage() {
       setSuccess(true);
       setNotes("");
       setQuantityKg("");
-      loadFeed(token);
+      setCropOther("");
+      setActivityTypeOther("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save entry");
     } finally {
@@ -149,7 +148,7 @@ export default function EntryPage() {
         {/* Entry form */}
         <div className="bg-white rounded-2xl border border-[#EDE7DA] p-4 shadow-sm mb-6">
           <p className="text-xs font-medium text-[#5C554A] mb-2">Crop</p>
-          <div className="grid grid-cols-2 gap-2 mb-4">
+          <div className={`grid grid-cols-3 gap-2 ${crop === "other" ? "mb-2" : "mb-4"}`}>
             {CROPS.map((c) => (
               <button
                 key={c.value}
@@ -164,9 +163,18 @@ export default function EntryPage() {
               </button>
             ))}
           </div>
+          {crop === "other" && (
+            <input
+              value={cropOther}
+              onChange={(e) => setCropOther(e.target.value)}
+              placeholder="What crop was it?"
+              className="w-full rounded-lg border border-[#E2DACB] px-3 py-2 text-sm mb-4
+                         focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest"
+            />
+          )}
 
           <p className="text-xs font-medium text-[#5C554A] mb-2">Activity</p>
-          <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className={`grid grid-cols-3 gap-2 ${activityType === "other" ? "mb-2" : "mb-4"}`}>
             {ACTIVITIES.map((a) => {
               const isHarvest = a.value === "harvest";
               const isIssue = a.value === "issue";
@@ -190,6 +198,15 @@ export default function EntryPage() {
               );
             })}
           </div>
+          {activityType === "other" && (
+            <input
+              value={activityTypeOther}
+              onChange={(e) => setActivityTypeOther(e.target.value)}
+              placeholder="What was the activity?"
+              className="w-full rounded-lg border border-[#E2DACB] px-3 py-2 text-sm mb-4
+                         focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest"
+            />
+          )}
 
           {/* Worker selection */}
           <p className="text-xs font-medium text-[#5C554A] mb-1.5">Worker</p>
@@ -308,35 +325,6 @@ export default function EntryPage() {
           >
             {saving ? "Saving…" : "Save entry"}
           </button>
-        </div>
-
-        {/* Live feed */}
-        <p className="text-xs font-medium text-[#5C554A] mb-2">Recent entries</p>
-        <div className="space-y-2">
-          {feedLoading && <p className="text-xs text-[#8A8175]">Loading…</p>}
-          {!feedLoading && feed.length === 0 && (
-            <p className="text-xs text-[#8A8175]">No entries yet — the first one you save shows up here.</p>
-          )}
-          {feed.map((item) => (
-            <div
-              key={item.id}
-              className={`bg-white rounded-xl border px-3 py-2.5 flex items-center justify-between ${
-                item.activity_type === "issue" ? "border-[#F6D2D0]" : "border-[#EDE7DA]"
-              }`}
-            >
-              <div>
-                <p className="text-sm text-[#2A2420]">
-                  {labelFor(ACTIVITIES, item.activity_type)} · {labelFor(CROPS, item.crop)}
-                  {item.activity_type === "harvest" && item.quantity_kg ? ` · ${item.quantity_kg}kg` : ""}
-                  {item.worker ? ` · ${item.worker.name}` : ""}
-                </p>
-                {item.notes && <p className="text-xs text-[#8A8175] mt-0.5">{item.notes}</p>}
-              </div>
-              <span className="text-xs text-[#B0A99B] whitespace-nowrap ml-3">
-                {new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </span>
-            </div>
-          ))}
         </div>
       </div>
     </div>

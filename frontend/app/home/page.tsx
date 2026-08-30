@@ -21,13 +21,16 @@ const ACTIVITY_LABELS: Record<string, string> = {
   issue: "Issue reported",
 };
 
-function describeActivity(a: Activity): string {
-  const crop = CROP_LABELS[a.crop] || a.crop;
-  const workerPart = a.worker ? ` — ${a.worker.name}` : "";
+function activityColumnText(a: Activity): string {
+  const crop = a.crop === "other" && a.crop_other ? a.crop_other : CROP_LABELS[a.crop] || a.crop;
   if (a.activity_type === "issue") {
-    return a.notes ? `Issue: ${a.notes}` : `Issue reported${workerPart}`;
+    return a.notes ? `Issue: ${a.notes}` : "Issue reported";
   }
-  return `${ACTIVITY_LABELS[a.activity_type] || a.activity_type}: ${crop}${workerPart}`;
+  const activityLabel =
+    a.activity_type === "other" && a.activity_type_other
+      ? a.activity_type_other
+      : ACTIVITY_LABELS[a.activity_type] || a.activity_type;
+  return `${activityLabel}: ${crop}`;
 }
 
 function timeAgo(iso: string): string {
@@ -39,6 +42,16 @@ function timeAgo(iso: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+function fullDateTime(iso: string): string {
+  return new Date(iso).toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export default function HomePage() {
@@ -225,27 +238,52 @@ export default function HomePage() {
             View all
           </button>
         </div>
-        <div className="bg-white rounded-xl border border-[#EDE7DA] divide-y divide-[#EDE7DA] overflow-hidden">
-          {loading && (
-            <p className="px-4 py-4 text-sm text-[#8A8175]">Loading…</p>
-          )}
+        <div className="bg-white rounded-xl border border-[#EDE7DA] overflow-hidden">
+          {loading && <p className="px-4 py-4 text-sm text-[#8A8175]">Loading…</p>}
           {!loading && recent.length === 0 && (
             <p className="px-4 py-4 text-sm text-[#8A8175]">No activity logged yet.</p>
           )}
-          {!loading &&
-            recent.map((a) => (
-              <div key={a.id} className="px-4 py-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span
-                    className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                      a.activity_type === "issue" ? "bg-[#B3261E]" : "bg-[#2F5233]"
-                    }`}
-                  />
-                  <p className="text-sm text-[#2A2420] truncate">{describeActivity(a)}</p>
-                </div>
-                <span className="text-[11px] text-[#B0A99B] flex-shrink-0">{timeAgo(a.created_at)}</span>
-              </div>
-            ))}
+          {!loading && recent.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-[#EDE7DA]">
+                    <th className="px-4 py-2 text-[10px] uppercase tracking-wide text-[#8A8175] font-medium whitespace-nowrap">
+                      Activity
+                    </th>
+                    <th className="px-4 py-2 text-[10px] uppercase tracking-wide text-[#8A8175] font-medium whitespace-nowrap">
+                      Person
+                    </th>
+                    <th className="px-4 py-2 text-[10px] uppercase tracking-wide text-[#8A8175] font-medium whitespace-nowrap">
+                      Date &amp; time
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recent.map((a) => (
+                    <tr key={a.id} className="border-b border-[#EDE7DA] last:border-b-0">
+                      <td className="px-4 py-2.5 text-sm text-[#2A2420]">
+                        <span className="flex items-center gap-2">
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                              a.activity_type === "issue" ? "bg-[#B3261E]" : "bg-[#2F5233]"
+                            }`}
+                          />
+                          <span className="whitespace-nowrap">{activityColumnText(a)}</span>
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-sm text-[#5C554A] whitespace-nowrap">
+                        {a.worker ? a.worker.name : "—"}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-[#8A8175] whitespace-nowrap">
+                        {fullDateTime(a.created_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 

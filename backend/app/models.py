@@ -99,6 +99,7 @@ class Buyer(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
     phone = Column(String, nullable=True)
+    category = Column(String, nullable=True)  # e.g. "Retailer", "Wholesaler", "Restaurant"
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -109,9 +110,17 @@ class Order(Base):
     buyer_id = Column(UUID(as_uuid=True), ForeignKey("buyers.id"), nullable=False)
     crop = Column(Enum(CropType, name="crop_type"), nullable=False)
     quantity_kg = Column(Numeric(10, 2), nullable=False)
-    price = Column(Numeric(12, 2), nullable=False)
+    price = Column(Numeric(12, 2), nullable=False)  # subtotal, before fees/tax
+    logistics_fee = Column(Numeric(12, 2), nullable=False, default=0)
+    tax = Column(Numeric(12, 2), nullable=False, default=0)
+    notify_sms = Column(Boolean, nullable=False, default=False)
+    notify_email = Column(Boolean, nullable=False, default=False)
     status = Column(Enum(OrderStatus, name="order_status"), nullable=False, default=OrderStatus.pending)
     logged_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     buyer = relationship("Buyer")
+
+    @property
+    def total_amount(self):
+        return self.price + self.logistics_fee + self.tax

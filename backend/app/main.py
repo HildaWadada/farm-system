@@ -1,5 +1,6 @@
-from datetime import datetime, timezone
-from typing import List
+from datetime import datetime, timezone, date
+from decimal import Decimal
+from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,10 +23,13 @@ from app.schemas import (
     WorkerDetail,
     BuyerCreate,
     BuyerOut,
+    BuyerDetail,
     OrderCreate,
     OrderOut,
     OrderStatusUpdate,
     LiveStockItem,
+    MonthlyLedger,
+    MonthlyLedgerCrop,
 )
 from app.auth import (
     verify_password,
@@ -158,7 +162,9 @@ def create_activity(
         logged_by=current_user.id,
         worker_id=payload.worker_id,
         activity_type=payload.activity_type,
+        activity_type_other=payload.activity_type_other if payload.activity_type == "other" else None,
         crop=payload.crop,
+        crop_other=payload.crop_other if payload.crop == "other" else None,
         quantity_kg=payload.quantity_kg if payload.activity_type == "harvest" else None,
         notes=payload.notes,
     )
@@ -249,7 +255,7 @@ def create_buyer(
     current_user: User = Depends(require_supervisor),
 ):
     """Buyers are passive contact records — they never log in. Save once, reuse on every order."""
-    buyer = Buyer(name=payload.name, phone=payload.phone)
+    buyer = Buyer(name=payload.name, phone=payload.phone, category=payload.category)
     db.add(buyer)
     db.commit()
     db.refresh(buyer)
@@ -262,6 +268,33 @@ def list_buyers(
     current_user: User = Depends(get_current_user),
 ):
     return db.query(Buyer).order_by(Buyer.name).all()
+
+
+@app.get("/buyers/{buyer_id}", response_model=BuyerDetail)
+def get_buyer(
+    buyer_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """A buyer's profile — their info plus every order logged against them."""
+    buyer = db.query(Buyer).filter(Buyer.id == buyer_id).first()
+    if not buyer:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Buyer not found")
+
+    orders = (
+        db.query(Order)
+        .filter(Order.buyer_id == buyer_id)
+        .order_by(Order.created_at.desc())
+        .all()
+    )
+    return BuyerDetail(
+        id=buyer.id,
+        name=buyer.name,
+        phone=buyer.phone,
+        category=buyer.category,
+        created_at=buyer.created_at,
+        orders=orders,
+    )
 
 
 @app.get("/live-stock", response_model=List[LiveStockItem])
@@ -279,12 +312,19 @@ def create_order(
 ):
     """Logs a sale against a buyer. Does not hard-block over-selling past live stock —
     it's a supervisor judgment call in the field — but the live-stock number is shown
-    on the form so they can see it before saving."""
+    on the form so they can see it before saving.
+
+    notify_sms / notify_email are recorded as the supervisor's stated preference only —
+    no message is actually sent yet, since no SMS or email provider is connected."""
     order = Order(
         buyer_id=payload.buyer_id,
         crop=payload.crop,
         quantity_kg=payload.quantity_kg,
         price=payload.price,
+        logistics_fee=payload.logistics_fee,
+        tax=payload.tax,
+        notify_sms=payload.notify_sms,
+        notify_email=payload.notify_email,
         logged_by=current_user.id,
     )
     db.add(order)
@@ -320,3 +360,60 @@ def update_order_status(
     db.commit()
     db.refresh(order)
     return order
+
+
+@app.get("/reports/monthly", response_model=MonthlyLedger)
+def get_monthly_ledger(
+    month: Optional[str] = None,  # "2026-08"; defaults to current month
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Revenue summary for a given month. Cancelled orders are excluded."""
+    if month:
+        try:
+            year_str, month_str = month.split("-")
+            period_start = date(int(year_str), int(month_str), 1)
+        except (ValueError, IndexError):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="month must be YYYY-MM")
+    else:
+        today = date.today()
+        period_start = date(today.year, today.month, 1)
+
+    if period_start.month == 12:
+        period_end = date(period_start.year + 1, 1, 1)
+    else:
+        period_end = date(period_start.year, period_start.month + 1, 1)
+
+    orders = (
+        db.query(Order)
+        .filter(Order.status != OrderStatus.cancelled)
+        .filter(Order.created_at >= period_start)
+        .filter(Order.created_at < period_end)
+        .all()
+    )
+
+    total_revenue = sum((o.total_amount for o in orders), Decimal("0"))
+    total_kg = sum((o.quantity_kg for o in orders), Decimal("0"))
+    order_count = len(orders)
+    avg_order_value = (total_revenue / order_count) if order_count else Decimal("0")
+
+    by_crop_map: dict[str, dict[str, Decimal]] = {}
+    for o in orders:
+        crop_key = o.crop.value if hasattr(o.crop, "value") else o.crop
+        entry = by_crop_map.setdefault(crop_key, {"quantity_kg": Decimal("0"), "revenue": Decimal("0")})
+        entry["quantity_kg"] += o.quantity_kg
+        entry["revenue"] += o.total_amount
+
+    by_crop = [
+        MonthlyLedgerCrop(crop=crop, quantity_kg=vals["quantity_kg"], revenue=vals["revenue"])
+        for crop, vals in sorted(by_crop_map.items())
+    ]
+
+    return MonthlyLedger(
+        month=f"{period_start.year:04d}-{period_start.month:02d}",
+        total_revenue=total_revenue,
+        order_count=order_count,
+        total_kg=total_kg,
+        avg_order_value=avg_order_value,
+        by_crop=by_crop,
+    )

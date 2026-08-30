@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireAuth } from "@/lib/useRequireAuth";
 import {
@@ -10,9 +10,11 @@ import {
   createOrder,
   updateOrderStatus,
   getLiveStock,
+  getMonthlyLedger,
   Buyer,
   Order,
   LiveStockItem,
+  MonthlyLedger,
 } from "@/lib/api";
 
 const CROPS = [
@@ -37,11 +39,23 @@ function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
+function money(n: number | string): string {
+  return Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
 const STATUS_STYLES: Record<string, string> = {
   pending: "bg-[#FFF4E0] text-[#8A5B00]",
   paid: "bg-[#EEF3EC] text-[#2F5233]",
-  cancelled: "bg-[#F1EFEA] text-[#8A8175]",
+  cancelled: "bg-[#FDECEC] text-[#B3261E]",
 };
+
+const STATUS_DOT: Record<string, string> = {
+  pending: "bg-[#C9962E]",
+  paid: "bg-[#2F5233]",
+  cancelled: "bg-[#B3261E]",
+};
+
+type StatusFilter = "all" | "pending" | "paid" | "cancelled";
 
 export default function OrdersPage() {
   const router = useRouter();
@@ -52,11 +66,18 @@ export default function OrdersPage() {
   const [liveStock, setLiveStock] = useState<LiveStockItem[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [search, setSearch] = useState("");
+
   const [showForm, setShowForm] = useState(false);
   const [crop, setCrop] = useState("citrus");
   const [buyerId, setBuyerId] = useState("");
   const [quantityKg, setQuantityKg] = useState("");
   const [price, setPrice] = useState("");
+  const [logisticsFee, setLogisticsFee] = useState("");
+  const [tax, setTax] = useState("");
+  const [notifySms, setNotifySms] = useState(false);
+  const [notifyEmail, setNotifyEmail] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,6 +85,10 @@ export default function OrdersPage() {
   const [newBuyerName, setNewBuyerName] = useState("");
   const [newBuyerPhone, setNewBuyerPhone] = useState("");
   const [savingBuyer, setSavingBuyer] = useState(false);
+
+  const [showReport, setShowReport] = useState(false);
+  const [report, setReport] = useState<MonthlyLedger | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
 
   useEffect(() => {
     if (!ready || !token) return;
@@ -92,6 +117,43 @@ export default function OrdersPage() {
     return item ? item.available_kg : "0";
   }
 
+  // ── KPI stats, computed from what we already have ──
+  const stats = useMemo(() => {
+    const active = orders.filter((o) => o.status !== "cancelled");
+    const totalRevenue = active
+      .filter((o) => o.status === "paid")
+      .reduce((sum, o) => sum + Number(o.total_amount), 0);
+    const pendingValue = orders
+      .filter((o) => o.status === "pending")
+      .reduce((sum, o) => sum + Number(o.total_amount), 0);
+    const completionRate =
+      active.length === 0
+        ? 0
+        : (orders.filter((o) => o.status === "paid").length / active.length) * 100;
+    return {
+      totalRevenue,
+      orderCount: orders.length,
+      pendingValue,
+      completionRate,
+    };
+  }, [orders]);
+
+  const orderTotal =
+    (Number(price) || 0) + (Number(logisticsFee) || 0) + (Number(tax) || 0);
+
+  const filteredOrders = useMemo(() => {
+    return orders.filter((o) => {
+      if (statusFilter !== "all" && o.status !== statusFilter) return false;
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        const matches =
+          o.buyer.name.toLowerCase().includes(q) || cropLabel(o.crop).toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+      return true;
+    });
+  }, [orders, statusFilter, search]);
+
   async function handleAddBuyer() {
     if (!token || !newBuyerName.trim()) return;
     setSavingBuyer(true);
@@ -114,7 +176,7 @@ export default function OrdersPage() {
 
   async function handleSaveOrder() {
     if (!token || !buyerId || !quantityKg || !price) {
-      setError("Pick a buyer and fill in quantity and price.");
+      setError("Pick a buyer and fill in quantity and subtotal.");
       return;
     }
     setSaving(true);
@@ -125,9 +187,17 @@ export default function OrdersPage() {
         crop,
         quantity_kg: Number(quantityKg),
         price: Number(price),
+        logistics_fee: Number(logisticsFee) || 0,
+        tax: Number(tax) || 0,
+        notify_sms: notifySms,
+        notify_email: notifyEmail,
       });
       setQuantityKg("");
       setPrice("");
+      setLogisticsFee("");
+      setTax("");
+      setNotifySms(false);
+      setNotifyEmail(false);
       setShowForm(false);
       refresh();
     } catch (err) {
@@ -147,6 +217,20 @@ export default function OrdersPage() {
     }
   }
 
+  async function openReport() {
+    setShowReport(true);
+    if (!token) return;
+    setReportLoading(true);
+    try {
+      const r = await getMonthlyLedger(token);
+      setReport(r);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setReportLoading(false);
+    }
+  }
+
   if (!ready) return null;
 
   const backHref = role === "owner" ? "/dashboard" : "/home";
@@ -160,12 +244,12 @@ export default function OrdersPage() {
               <path d="M15 18l-6-6 6-6" />
             </svg>
           </button>
-          <span className="font-semibold text-[#2A2420] text-sm">Orders</span>
+          <span className="font-semibold text-[#2A2420] text-sm">Sales orders</span>
         </div>
         {role === "supervisor" && (
           <button
             onClick={() => setShowForm((v) => !v)}
-            className="text-xs font-medium text-forest border border-forest/30 rounded-lg px-3 py-1.5 hover:bg-[#EAF2EA] transition-colors"
+            className="text-xs font-medium text-white bg-forest rounded-lg px-3 py-1.5 hover:bg-forestDark transition-colors"
           >
             {showForm ? "Cancel" : "+ New order"}
           </button>
@@ -173,11 +257,19 @@ export default function OrdersPage() {
       </div>
 
       <div className="px-4 pt-4">
+        {/* KPI stat cards */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <StatCard label="Total revenue" value={`KES ${money(stats.totalRevenue)}`} accent="text-forest" />
+          <StatCard label="Orders" value={String(stats.orderCount)} accent="text-[#2A2420]" />
+          <StatCard label="Pending value" value={`KES ${money(stats.pendingValue)}`} accent="text-[#8A5B00]" />
+          <StatCard label="Completion rate" value={`${stats.completionRate.toFixed(1)}%`} accent="text-forest" />
+        </div>
+
         {/* Live stock strip */}
         <p className="text-[11px] uppercase tracking-wide text-[#8A8175] font-medium mb-2">
           Live stock
         </p>
-        <div className="grid grid-cols-4 gap-2 mb-5">
+        <div className="grid grid-cols-4 gap-2 mb-4">
           {CROPS.map((c) => (
             <div key={c.value} className="bg-white rounded-lg border border-[#EDE7DA] py-2 px-1 text-center">
               <p className="text-sm font-semibold text-forest">{stockFor(c.value)}</p>
@@ -185,6 +277,17 @@ export default function OrdersPage() {
             </div>
           ))}
         </div>
+
+        <button
+          onClick={openReport}
+          className="w-full mb-5 text-xs font-medium text-forest border border-forest/30 rounded-lg py-2 hover:bg-[#EAF2EA] transition-colors flex items-center justify-center gap-1.5"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+            <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+          </svg>
+          Monthly ledger report
+        </button>
 
         {/* New order form */}
         {showForm && (
@@ -277,7 +380,7 @@ export default function OrdersPage() {
                 />
               </div>
               <div>
-                <p className="text-xs font-medium text-[#5C554A] mb-1.5">Price (total)</p>
+                <p className="text-xs font-medium text-[#5C554A] mb-1.5">Subtotal</p>
                 <input
                   type="number"
                   inputMode="decimal"
@@ -288,6 +391,75 @@ export default function OrdersPage() {
                              focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest"
                 />
               </div>
+              <div>
+                <p className="text-xs font-medium text-[#5C554A] mb-1.5">Logistics fee</p>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={logisticsFee}
+                  onChange={(e) => setLogisticsFee(e.target.value)}
+                  placeholder="0"
+                  className="w-full rounded-lg border border-[#E2DACB] px-3 py-2 text-sm
+                             focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest"
+                />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-[#5C554A] mb-1.5">Tax</p>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={tax}
+                  onChange={(e) => setTax(e.target.value)}
+                  placeholder="0"
+                  className="w-full rounded-lg border border-[#E2DACB] px-3 py-2 text-sm
+                             focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest"
+                />
+              </div>
+            </div>
+
+            {/* Order summary */}
+            <div className="bg-[#EAF2EA] rounded-xl p-3 mb-4">
+              <div className="flex justify-between text-xs text-[#5C554A] mb-1">
+                <span>Subtotal</span>
+                <span>KES {money(price || 0)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-[#5C554A] mb-1">
+                <span>Logistics fee</span>
+                <span>KES {money(logisticsFee || 0)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-[#5C554A] mb-2">
+                <span>Tax</span>
+                <span>KES {money(tax || 0)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-semibold text-forest border-t border-forest/20 pt-2">
+                <span>Total amount</span>
+                <span>KES {money(orderTotal)}</span>
+              </div>
+            </div>
+
+            {/* Notify — preference only, not wired to a real messaging provider yet */}
+            <div className="mb-4 space-y-1.5">
+              <label className="flex items-center gap-2 text-xs text-[#5C554A]">
+                <input
+                  type="checkbox"
+                  checked={notifySms}
+                  onChange={(e) => setNotifySms(e.target.checked)}
+                  className="rounded border-[#E2DACB]"
+                />
+                Notify buyer by SMS
+              </label>
+              <label className="flex items-center gap-2 text-xs text-[#5C554A]">
+                <input
+                  type="checkbox"
+                  checked={notifyEmail}
+                  onChange={(e) => setNotifyEmail(e.target.checked)}
+                  className="rounded border-[#E2DACB]"
+                />
+                Notify buyer by email
+              </label>
+              <p className="text-[10px] text-[#B0A99B]">
+                These are saved as a preference for now — no SMS/email service is connected yet, so nothing is actually sent.
+              </p>
             </div>
 
             {error && (
@@ -301,21 +473,44 @@ export default function OrdersPage() {
               disabled={saving}
               className="w-full bg-forest text-white text-sm font-medium rounded-lg py-2.5 hover:bg-forestDark transition-colors disabled:opacity-60"
             >
-              {saving ? "Saving…" : "Save order"}
+              {saving ? "Saving…" : "Confirm order"}
             </button>
           </div>
         )}
 
+        {/* Search + status filter */}
+        <div className="flex items-center gap-2 mb-2">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search buyer or crop…"
+            className="flex-1 rounded-lg border border-[#E2DACB] px-3 py-2 text-sm bg-white
+                       focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest"
+          />
+        </div>
+        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
+          {(["all", "pending", "paid", "cancelled"] as StatusFilter[]).map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`text-xs font-medium rounded-full px-3 py-1.5 whitespace-nowrap capitalize border transition-colors ${
+                statusFilter === s
+                  ? "bg-forest text-white border-forest"
+                  : "bg-white text-[#5C554A] border-[#E2DACB]"
+              }`}
+            >
+              {s === "all" ? "All orders" : s}
+            </button>
+          ))}
+        </div>
+
         {/* Order history */}
-        <p className="text-[11px] uppercase tracking-wide text-[#8A8175] font-medium mb-2">
-          Order history
-        </p>
         {loading && <p className="text-sm text-[#8A8175]">Loading…</p>}
-        {!loading && orders.length === 0 && (
-          <p className="text-sm text-[#8A8175]">No orders logged yet.</p>
+        {!loading && filteredOrders.length === 0 && (
+          <p className="text-sm text-[#8A8175]">No orders match.</p>
         )}
         <div className="space-y-2">
-          {orders.map((o) => (
+          {filteredOrders.map((o) => (
             <div key={o.id} className="bg-white rounded-xl border border-[#EDE7DA] p-3.5">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -323,13 +518,24 @@ export default function OrdersPage() {
                     {o.buyer.name} · {cropLabel(o.crop)}
                   </p>
                   <p className="text-xs text-[#8A8175] mt-0.5">
-                    {o.quantity_kg}kg · KES {Number(o.price).toLocaleString()} · {timeAgo(o.created_at)}
+                    {o.quantity_kg}kg · KES {money(o.total_amount)} · {timeAgo(o.created_at)}
                   </p>
                 </div>
-                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 capitalize ${STATUS_STYLES[o.status]}`}>
+                <span
+                  className={`flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 capitalize ${STATUS_STYLES[o.status]}`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[o.status]}`} />
                   {o.status}
                 </span>
               </div>
+
+              {(Number(o.logistics_fee) > 0 || Number(o.tax) > 0) && (
+                <p className="text-[10px] text-[#B0A99B] mt-1">
+                  Subtotal KES {money(o.price)}
+                  {Number(o.logistics_fee) > 0 ? ` · Logistics KES ${money(o.logistics_fee)}` : ""}
+                  {Number(o.tax) > 0 ? ` · Tax KES ${money(o.tax)}` : ""}
+                </p>
+              )}
 
               {role === "supervisor" && o.status === "pending" && (
                 <div className="flex gap-2 mt-3">
@@ -351,6 +557,62 @@ export default function OrdersPage() {
           ))}
         </div>
       </div>
+
+      {/* Monthly ledger report modal */}
+      {showReport && (
+        <div className="fixed inset-0 bg-black/30 flex items-end sm:items-center justify-center z-20 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold text-[#2A2420]">Monthly ledger report</p>
+              <button onClick={() => setShowReport(false)} className="text-[#8A8175]">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {reportLoading && <p className="text-sm text-[#8A8175]">Loading…</p>}
+
+            {!reportLoading && report && (
+              <>
+                <p className="text-xs text-[#8A8175] mb-3">{report.month}</p>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  <StatCard label="Total revenue" value={`KES ${money(report.total_revenue)}`} accent="text-forest" />
+                  <StatCard label="Orders" value={String(report.order_count)} accent="text-[#2A2420]" />
+                  <StatCard label="Total kg sold" value={`${money(report.total_kg)}kg`} accent="text-[#2A2420]" />
+                  <StatCard label="Avg order value" value={`KES ${money(report.avg_order_value)}`} accent="text-forest" />
+                </div>
+
+                <p className="text-[11px] uppercase tracking-wide text-[#8A8175] font-medium mb-2">
+                  By crop
+                </p>
+                <div className="bg-[#FBF8F2] rounded-xl border border-[#EDE7DA] divide-y divide-[#EDE7DA] overflow-hidden">
+                  {report.by_crop.length === 0 && (
+                    <p className="px-3 py-3 text-xs text-[#8A8175]">No orders this month yet.</p>
+                  )}
+                  {report.by_crop.map((c) => (
+                    <div key={c.crop} className="px-3 py-2.5 flex items-center justify-between">
+                      <span className="text-sm text-[#2A2420]">{cropLabel(c.crop)}</span>
+                      <span className="text-xs text-[#8A8175]">
+                        {money(c.quantity_kg)}kg · KES {money(c.revenue)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatCard({ label, value, accent }: { label: string; value: string; accent: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-[#EDE7DA] py-3 px-3">
+      <p className={`text-base font-semibold ${accent}`}>{value}</p>
+      <p className="text-[10px] text-[#8A8175] mt-0.5 leading-tight">{label}</p>
     </div>
   );
 }

@@ -97,12 +97,14 @@ class HomeSummary(BaseModel):
 class BuyerCreate(BaseModel):
     name: str
     phone: Optional[str] = None
+    category: Optional[str] = None
 
 
 class BuyerOut(BaseModel):
     id: uuid.UUID
     name: str
     phone: Optional[str]
+    category: Optional[str]
     created_at: datetime
 
     class Config:
@@ -113,7 +115,11 @@ class OrderCreate(BaseModel):
     buyer_id: uuid.UUID
     crop: str
     quantity_kg: Decimal
-    price: Decimal
+    price: Decimal  # subtotal, before fees/tax
+    logistics_fee: Decimal = Decimal("0")
+    tax: Decimal = Decimal("0")
+    notify_sms: bool = False
+    notify_email: bool = False
 
 
 class OrderStatusUpdate(BaseModel):
@@ -125,12 +131,36 @@ class OrderOut(BaseModel):
     crop: str
     quantity_kg: Decimal
     price: Decimal
+    logistics_fee: Decimal
+    tax: Decimal
+    total_amount: Decimal
+    notify_sms: bool
+    notify_email: bool
     status: str
     created_at: datetime
     buyer: BuyerOut
 
     class Config:
         from_attributes = True
+
+
+class BuyerDetail(BuyerOut):
+    orders: list[OrderOut] = []
+
+
+class MonthlyLedgerCrop(BaseModel):
+    crop: str
+    quantity_kg: Decimal
+    revenue: Decimal
+
+
+class MonthlyLedger(BaseModel):
+    month: str  # "2026-08"
+    total_revenue: Decimal
+    order_count: int
+    total_kg: Decimal
+    avg_order_value: Decimal
+    by_crop: list[MonthlyLedgerCrop]
 
 
 class LiveStockItem(BaseModel):

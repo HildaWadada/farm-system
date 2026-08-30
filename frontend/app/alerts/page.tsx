@@ -98,7 +98,9 @@ export default function AlertsPage() {
                       {alert.activity.notes || "Issue reported"}
                     </p>
                     <p className="text-xs text-[#8A8175] mt-0.5">
-                      {CROP_LABELS[alert.activity.crop] || alert.activity.crop}
+                      {alert.activity.crop === "other" && alert.activity.crop_other
+                        ? alert.activity.crop_other
+                        : CROP_LABELS[alert.activity.crop] || alert.activity.crop}
                       {alert.activity.worker ? ` — ${alert.activity.worker.name}` : ""} ·{" "}
                       {timeAgo(alert.created_at)}
                     </p>

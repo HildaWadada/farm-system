@@ -10,6 +10,7 @@ const CROPS = [
   { value: "citrus", label: "Citrus" },
   { value: "hass_avocado", label: "Hass avocado" },
   { value: "chilli", label: "Chilli" },
+  { value: "other", label: "Other" },
 ];
 
 const ACTIVITY_TYPES = [
@@ -19,12 +20,15 @@ const ACTIVITY_TYPES = [
   { value: "irrigate", label: "Irrigate" },
   { value: "fertilize", label: "Fertilize" },
   { value: "issue", label: "Issue" },
+  { value: "other", label: "Other" },
 ];
 
-function cropLabel(value: string) {
+function cropLabel(value: string, customText?: string | null) {
+  if (value === "other" && customText) return customText;
   return CROPS.find((c) => c.value === value)?.label ?? value;
 }
-function activityLabel(value: string) {
+function activityLabel(value: string, customText?: string | null) {
+  if (value === "other" && customText) return customText;
   return ACTIVITY_TYPES.find((a) => a.value === value)?.label ?? value;
 }
 
@@ -187,7 +191,8 @@ export default function ActivityFeedPage() {
                       />
                       <div className="min-w-0">
                         <p className="text-sm text-[#2A2420]">
-                          {activityLabel(item.activity_type)} · {cropLabel(item.crop)}
+                          {activityLabel(item.activity_type, item.activity_type_other)} ·{" "}
+                          {cropLabel(item.crop, item.crop_other)}
                         </p>
                         {item.worker && (
                           <p className="text-xs text-[#5C554A] mt-0.5">{item.worker.name}</p>

@@ -34,7 +34,9 @@ export type Worker = {
 export type Activity = {
   id: string;
   activity_type: string;
+  activity_type_other: string | null;
   crop: string;
+  crop_other: string | null;
   block: string | null;
   quantity_kg: string | null;
   notes: string | null;
@@ -93,7 +95,9 @@ export async function createActivity(
   token: string,
   data: {
     activity_type: string;
+    activity_type_other?: string;
     crop: string;
+    crop_other?: string;
     worker_id?: string;
     quantity_kg?: number;
     notes?: string;
@@ -205,12 +209,13 @@ export type Buyer = {
   id: string;
   name: string;
   phone: string | null;
+  category: string | null;
   created_at: string;
 };
 
 export async function createBuyer(
   token: string,
-  data: { name: string; phone?: string }
+  data: { name: string; phone?: string; category?: string }
 ): Promise<Buyer> {
   const res = await fetch(`${API_URL}/buyers`, {
     method: "POST",
@@ -241,6 +246,20 @@ export async function listBuyers(token: string): Promise<Buyer[]> {
   return res.json();
 }
 
+export type BuyerDetail = Buyer & { orders: Order[] };
+
+export async function getBuyer(token: string, buyerId: string): Promise<BuyerDetail> {
+  const res = await fetch(`${API_URL}/buyers/${buyerId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Could not load buyer");
+  }
+
+  return res.json();
+}
+
 export type LiveStockItem = {
   crop: string;
   available_kg: string;
@@ -263,6 +282,11 @@ export type Order = {
   crop: string;
   quantity_kg: string;
   price: string;
+  logistics_fee: string;
+  tax: string;
+  total_amount: string;
+  notify_sms: boolean;
+  notify_email: boolean;
   status: "pending" | "paid" | "cancelled";
   created_at: string;
   buyer: Buyer;
@@ -270,7 +294,16 @@ export type Order = {
 
 export async function createOrder(
   token: string,
-  data: { buyer_id: string; crop: string; quantity_kg: number; price: number }
+  data: {
+    buyer_id: string;
+    crop: string;
+    quantity_kg: number;
+    price: number;
+    logistics_fee?: number;
+    tax?: number;
+    notify_sms?: boolean;
+    notify_email?: boolean;
+  }
 ): Promise<Order> {
   const res = await fetch(`${API_URL}/orders`, {
     method: "POST",
@@ -318,6 +351,30 @@ export async function updateOrderStatus(
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.detail || "Could not update order");
+  }
+
+  return res.json();
+}
+
+export type MonthlyLedger = {
+  month: string;
+  total_revenue: string;
+  order_count: number;
+  total_kg: string;
+  avg_order_value: string;
+  by_crop: { crop: string; quantity_kg: string; revenue: string }[];
+};
+
+export async function getMonthlyLedger(token: string, month?: string): Promise<MonthlyLedger> {
+  const url = month
+    ? `${API_URL}/reports/monthly?month=${month}`
+    : `${API_URL}/reports/monthly`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Could not load monthly report");
   }
 
   return res.json();
