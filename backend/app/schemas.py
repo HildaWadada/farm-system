@@ -23,6 +23,19 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
 class UserOut(BaseModel):
     id: uuid.UUID
     name: str
@@ -51,8 +64,10 @@ class WorkerOut(BaseModel):
 
 
 class ActivityCreate(BaseModel):
-    activity_type: str  # spray | weed | irrigate | fertilize | harvest | issue
-    crop: str           # dragon_fruit | citrus | hass_avocado | chilli
+    activity_type: str  # spray | weed | irrigate | fertilize | harvest | issue | other
+    activity_type_other: Optional[str] = None  # required when activity_type == "other"
+    crop: str           # dragon_fruit | citrus | hass_avocado | chilli | other
+    crop_other: Optional[str] = None  # required when crop == "other"
     worker_id: Optional[uuid.UUID] = None
     quantity_kg: Optional[Decimal] = None  # only meaningful when activity_type == "harvest"
     notes: Optional[str] = None
@@ -61,7 +76,9 @@ class ActivityCreate(BaseModel):
 class ActivityOut(BaseModel):
     id: uuid.UUID
     activity_type: str
+    activity_type_other: Optional[str] = None
     crop: str
+    crop_other: Optional[str] = None
     block: Optional[str]
     quantity_kg: Optional[Decimal]
     notes: Optional[str]

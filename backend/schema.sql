@@ -14,13 +14,15 @@ CREATE TYPE alert_status AS ENUM ('open', 'resolved');
 -- Users: only ever 2 rows for now (owner, supervisor). Created by seed.py.
 -- ─────────────────────────────────────────────
 CREATE TABLE users (
-    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name                TEXT NOT NULL,
-    email               TEXT NOT NULL UNIQUE,
-    password_hash       TEXT NOT NULL,
-    role                user_role NOT NULL,
-    must_change_password BOOLEAN NOT NULL DEFAULT TRUE,  -- forces password change on first login
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name                    TEXT NOT NULL,
+    email                   TEXT NOT NULL UNIQUE,
+    password_hash           TEXT NOT NULL,
+    role                    user_role NOT NULL,
+    must_change_password    BOOLEAN NOT NULL DEFAULT TRUE,  -- forces password change on first login
+    reset_token_hash        TEXT,                            -- sha256 of an active forgot-password token
+    reset_token_expires_at  TIMESTAMPTZ,
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- ─────────────────────────────────────────────

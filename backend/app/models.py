@@ -21,6 +21,7 @@ class ActivityType(str, enum.Enum):
     fertilize = "fertilize"
     harvest = "harvest"
     issue = "issue"
+    other = "other"
 
 
 class CropType(str, enum.Enum):
@@ -28,6 +29,7 @@ class CropType(str, enum.Enum):
     citrus = "citrus"
     hass_avocado = "hass_avocado"
     chilli = "chilli"
+    other = "other"
 
 
 class AlertStatus(str, enum.Enum):
@@ -50,6 +52,8 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     role = Column(Enum(UserRole, name="user_role"), nullable=False)
     must_change_password = Column(Boolean, nullable=False, default=True)
+    reset_token_hash = Column(String, nullable=True)
+    reset_token_expires_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -70,7 +74,9 @@ class Activity(Base):
     logged_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     worker_id = Column(UUID(as_uuid=True), ForeignKey("workers.id"), nullable=True)
     activity_type = Column(Enum(ActivityType, name="activity_type"), nullable=False)
+    activity_type_other = Column(Text, nullable=True)  # free text when activity_type = 'other'
     crop = Column(Enum(CropType, name="crop_type"), nullable=False)
+    crop_other = Column(Text, nullable=True)  # free text when crop = 'other'
     block = Column(String, nullable=True)
     quantity_kg = Column(Numeric(10, 2), nullable=True)
     photo_url = Column(String, nullable=True)

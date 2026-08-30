@@ -1,4 +1,6 @@
-from datetime import datetime, timezone, date
+import hashlib
+import secrets
+from datetime import datetime, timezone, date, timedelta
 from decimal import Decimal
 from typing import List, Optional
 
@@ -8,11 +10,15 @@ from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.config import settings
 from app.models import User, Activity, Alert, AlertStatus, Worker, Buyer, Order, OrderStatus
 from app.schemas import (
     LoginRequest,
     LoginResponse,
     ChangePasswordRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    MessageResponse,
     UserOut,
     ActivityCreate,
     ActivityOut,
@@ -38,6 +44,7 @@ from app.auth import (
     get_current_user,
     require_supervisor,
 )
+from app.email import send_password_reset_email
 
 app = FastAPI(title="Farm Platform API")
 
@@ -94,6 +101,69 @@ def change_password(
     current_user.must_change_password = False
     db.commit()
     return {"detail": "Password updated"}
+
+
+RESET_TOKEN_TTL_MINUTES = 30
+
+
+def _hash_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode()).hexdigest()
+
+
+@app.post("/auth/forgot-password", response_model=MessageResponse)
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Always returns the same generic message, whether or not the email matches an
+    account — this avoids letting someone probe which emails are registered.
+
+    If a Resend domain isn't verified yet, the email only actually arrives when
+    sent to the address the Resend account itself was signed up with.
+    """
+    generic_message = "If an account exists with that email, a reset link has been sent."
+
+    user = db.query(User).filter(User.email == payload.email).first()
+    if user:
+        raw_token = secrets.token_urlsafe(32)
+        user.reset_token_hash = _hash_token(raw_token)
+        user.reset_token_expires_at = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_TTL_MINUTES)
+        db.commit()
+
+        reset_link = f"{settings.frontend_url}/reset-password?token={raw_token}"
+        send_password_reset_email(user.email, reset_link)
+
+    return MessageResponse(message=generic_message)
+
+
+@app.post("/auth/reset-password", response_model=MessageResponse)
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    if len(payload.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be at least 8 characters",
+        )
+
+    token_hash = _hash_token(payload.token)
+    now = datetime.now(timezone.utc)
+    user = (
+        db.query(User)
+        .filter(User.reset_token_hash == token_hash)
+        .filter(User.reset_token_expires_at != None)  # noqa: E711
+        .filter(User.reset_token_expires_at > now)
+        .first()
+    )
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This reset link is invalid or has expired. Request a new one.",
+        )
+
+    user.password_hash = hash_password(payload.new_password)
+    user.must_change_password = False
+    user.reset_token_hash = None
+    user.reset_token_expires_at = None
+    db.commit()
+
+    return MessageResponse(message="Password updated. You can now log in.")
 
 
 @app.get("/auth/me", response_model=UserOut)
