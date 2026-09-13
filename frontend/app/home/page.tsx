@@ -3,7 +3,22 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireAuth } from "@/lib/useRequireAuth";
-import { getSummary, listActivities, Summary, Activity } from "@/lib/api";
+import {
+  getSummary,
+  listActivities,
+  listWorkers,
+  listOrders,
+  listBuyers,
+  listPurchases,
+  listAlerts,
+  Summary,
+  Activity,
+  Worker,
+  Order,
+  Buyer,
+  Purchase,
+  Alert,
+} from "@/lib/api";
 
 const CROP_LABELS: Record<string, string> = {
   dragon_fruit: "Dragon fruit",
@@ -13,12 +28,12 @@ const CROP_LABELS: Record<string, string> = {
 };
 
 const ACTIVITY_LABELS: Record<string, string> = {
-  spray: "Spray logged",
-  weed: "Weeding logged",
-  irrigate: "Irrigation logged",
-  fertilize: "Fertilizing logged",
-  harvest: "Harvest logged",
-  issue: "Issue reported",
+  spray: "Spray",
+  weed: "Weeding",
+  irrigate: "Irrigation",
+  fertilize: "Fertilizing",
+  harvest: "Harvest",
+  issue: "Issue",
 };
 
 function activityColumnText(a: Activity): string {
@@ -54,11 +69,28 @@ function fullDateTime(iso: string): string {
   });
 }
 
+function money(n: number | string): string {
+  return Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function byRecency<T extends { created_at: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+type PreviewItem = { primary: string; secondary: string };
+
 export default function HomePage() {
   const router = useRouter();
   const { ready, token, name, logout } = useRequireAuth("supervisor");
   const [summary, setSummary] = useState<Summary | null>(null);
   const [recent, setRecent] = useState<Activity[]>([]);
+
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [buyers, setBuyers] = useState<Buyer[]>([]);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [openAlerts, setOpenAlerts] = useState<Alert[]>([]);
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -66,12 +98,22 @@ export default function HomePage() {
 
     async function load() {
       try {
-        const [s, activities] = await Promise.all([
+        const [s, activities, w, o, b, p, a] = await Promise.all([
           getSummary(token!),
           listActivities(token!),
+          listWorkers(token!),
+          listOrders(token!),
+          listBuyers(token!),
+          listPurchases(token!),
+          listAlerts(token!),
         ]);
         setSummary(s);
         setRecent(activities.slice(0, 4));
+        setWorkers(w);
+        setOrders(o);
+        setBuyers(b);
+        setPurchases(p);
+        setOpenAlerts(a.filter((alert) => alert.status === "open"));
       } catch (err) {
         console.error(err);
       } finally {
@@ -90,6 +132,30 @@ export default function HomePage() {
     if (hour < 17) return "Good afternoon";
     return "Good evening";
   })();
+
+  const activityPreview: PreviewItem[] = byRecency(recent)
+    .slice(0, 2)
+    .map((a) => ({ primary: activityColumnText(a), secondary: timeAgo(a.created_at) }));
+
+  const workerPreview: PreviewItem[] = byRecency(workers)
+    .slice(0, 2)
+    .map((w) => ({ primary: w.name, secondary: w.role || "No role set" }));
+
+  const orderPreview: PreviewItem[] = byRecency(orders)
+    .slice(0, 2)
+    .map((o) => ({ primary: o.buyer.name, secondary: `KES ${money(o.total_amount)}` }));
+
+  const buyerPreview: PreviewItem[] = byRecency(buyers)
+    .slice(0, 2)
+    .map((b) => ({ primary: b.name, secondary: b.category || "No category" }));
+
+  const purchasePreview: PreviewItem[] = byRecency(purchases)
+    .slice(0, 2)
+    .map((p) => ({ primary: p.vendor.name, secondary: p.item }));
+
+  const alertPreview: PreviewItem[] = byRecency(openAlerts)
+    .slice(0, 2)
+    .map((a) => ({ primary: a.activity.notes || "Issue reported", secondary: timeAgo(a.created_at) }));
 
   return (
     <div className="min-h-screen bg-[#FBF8F2] pb-20">
@@ -127,25 +193,53 @@ export default function HomePage() {
           {greeting}, {firstName}
         </h1>
 
-        {/* Stat cards */}
+        {/* Stat cards — same visual language as the owner's dashboard */}
         <div className="grid grid-cols-3 gap-2 mt-4">
-          <div className="bg-white rounded-xl border border-[#EDE7DA] py-3 px-2 text-center">
-            <p className="text-xl font-semibold text-[#2F5233]">
-              {loading ? "—" : summary?.today_entries ?? 0}
-            </p>
-            <p className="text-[10px] text-[#8A8175] mt-0.5 leading-tight">Today's entries</p>
-          </div>
-          <div className="bg-white rounded-xl border border-[#EDE7DA] py-3 px-2 text-center">
-            <p className="text-xl font-semibold text-[#B3261E]">
-              {loading ? "—" : summary?.active_alerts ?? 0}
-            </p>
-            <p className="text-[10px] text-[#8A8175] mt-0.5 leading-tight">Active alerts</p>
-          </div>
-          <div className="bg-white rounded-xl border border-[#EDE7DA] py-3 px-2 text-center">
-            <p className="text-xl font-semibold text-[#8A8175]">
-              {loading ? "—" : summary?.pending_sync ?? 0}
-            </p>
-            <p className="text-[10px] text-[#8A8175] mt-0.5 leading-tight">Pending sync</p>
+          <button
+            onClick={() => router.push("/activity")}
+            className="bg-white rounded-2xl border border-[#EDE7DA] p-3 flex flex-col items-start gap-2 text-left hover:border-forest/40 transition-colors"
+          >
+            <div className="w-7 h-7 rounded-lg bg-[#EEF3EC] flex items-center justify-center text-forest">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 12h4l3 8 4-16 3 8h4" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-[#2A2420] leading-tight">
+                {loading ? "—" : summary?.today_entries ?? 0}
+              </p>
+              <p className="text-[10px] text-[#8A8175] leading-tight">Today's entries</p>
+            </div>
+          </button>
+          <button
+            onClick={() => router.push("/alerts")}
+            className="bg-white rounded-2xl border border-[#EDE7DA] p-3 flex flex-col items-start gap-2 text-left hover:border-forest/40 transition-colors"
+          >
+            <div className="w-7 h-7 rounded-lg bg-[#FDECEC] flex items-center justify-center text-[#B3261E]">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 9v4M12 17h.01" />
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-[#2A2420] leading-tight">
+                {loading ? "—" : summary?.active_alerts ?? 0}
+              </p>
+              <p className="text-[10px] text-[#8A8175] leading-tight">Active alerts</p>
+            </div>
+          </button>
+          <div className="bg-white rounded-2xl border border-[#EDE7DA] p-3 flex flex-col items-start gap-2">
+            <div className="w-7 h-7 rounded-lg bg-[#F1EFEA] flex items-center justify-center text-[#8A8175]">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-[#2A2420] leading-tight">
+                {loading ? "—" : summary?.pending_sync ?? 0}
+              </p>
+              <p className="text-[10px] text-[#8A8175] leading-tight">Pending sync</p>
+            </div>
           </div>
         </div>
 
@@ -160,23 +254,25 @@ export default function HomePage() {
           New field entry
         </button>
 
-        {/* Quick access */}
+        {/* Quick access — each card previews the 2 most recent entries */}
         <p className="text-[11px] uppercase tracking-wide text-[#8A8175] font-medium mt-6 mb-2">
           Quick access
         </p>
-        <div className="bg-white rounded-xl border border-[#EDE7DA] divide-y divide-[#EDE7DA] overflow-hidden">
-          <QuickAccessRow
+        <div className="grid grid-cols-2 gap-3">
+          <PreviewCard
             title="Activity feed"
-            subtitle="View recent field logs and updates"
             onClick={() => router.push("/activity")}
-            icon={
-              <path d="M3 12h4l3 8 4-16 3 8h4" />
-            }
+            loading={loading}
+            items={activityPreview}
+            emptyText="No entries yet"
+            icon={<path d="M3 12h4l3 8 4-16 3 8h4" />}
           />
-          <QuickAccessRow
+          <PreviewCard
             title="Workers"
-            subtitle="Add workers and view their activity"
             onClick={() => router.push("/workers")}
+            loading={loading}
+            items={workerPreview}
+            emptyText="No workers yet"
             icon={
               <>
                 <circle cx="9" cy="7" r="4" />
@@ -185,10 +281,12 @@ export default function HomePage() {
               </>
             }
           />
-          <QuickAccessRow
+          <PreviewCard
             title="Orders"
-            subtitle="Log sales and see live stock"
             onClick={() => router.push("/orders")}
+            loading={loading}
+            items={orderPreview}
+            emptyText="No orders yet"
             icon={
               <>
                 <path d="M6 2l1.5 5h9L18 2" />
@@ -196,10 +294,12 @@ export default function HomePage() {
               </>
             }
           />
-          <QuickAccessRow
+          <PreviewCard
             title="Buyers"
-            subtitle="View and add buyer contacts"
             onClick={() => router.push("/buyers")}
+            loading={loading}
+            items={buyerPreview}
+            emptyText="No buyers yet"
             icon={
               <>
                 <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
@@ -208,23 +308,30 @@ export default function HomePage() {
               </>
             }
           />
-          <QuickAccessRow
+          <PreviewCard
+            title="Purchases"
+            onClick={() => router.push("/purchases")}
+            loading={loading}
+            items={purchasePreview}
+            emptyText="No purchases yet"
+            icon={
+              <>
+                <path d="M6 2l1.5 5h9L18 2" />
+                <path d="M3.5 7h17l-1.6 11.2A2 2 0 0117 20H7a2 2 0 01-1.9-1.8L3.5 7z" />
+              </>
+            }
+          />
+          <PreviewCard
             title="Safety alerts"
-            subtitle="View and resolve equipment issues"
             onClick={() => router.push("/alerts")}
+            loading={loading}
+            items={alertPreview}
+            emptyText="No open alerts"
             icon={
               <>
                 <path d="M12 9v4M12 17h.01" />
                 <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
               </>
-            }
-          />
-          <QuickAccessRow
-            title="Sync status"
-            subtitle="Everything is up to date"
-            onClick={undefined}
-            icon={
-              <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
             }
           />
         </div>
@@ -238,7 +345,7 @@ export default function HomePage() {
             View all
           </button>
         </div>
-        <div className="bg-white rounded-xl border border-[#EDE7DA] overflow-hidden">
+        <div className="bg-white rounded-2xl border border-[#EDE7DA] overflow-hidden">
           {loading && <p className="px-4 py-4 text-sm text-[#8A8175]">Loading…</p>}
           {!loading && recent.length === 0 && (
             <p className="px-4 py-4 text-sm text-[#8A8175]">No activity logged yet.</p>
@@ -303,37 +410,53 @@ export default function HomePage() {
   );
 }
 
-function QuickAccessRow({
+function PreviewCard({
   title,
-  subtitle,
   onClick,
   icon,
+  items,
+  loading,
+  emptyText,
 }: {
   title: string;
-  subtitle: string;
-  onClick?: () => void;
+  onClick: () => void;
   icon: React.ReactNode;
+  items: PreviewItem[];
+  loading: boolean;
+  emptyText: string;
 }) {
   return (
     <button
       onClick={onClick}
-      disabled={!onClick}
-      className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-[#FBF8F2] transition-colors disabled:hover:bg-transparent"
+      className="bg-white rounded-2xl border border-[#EDE7DA] p-3 text-left hover:border-forest/40 transition-colors flex flex-col"
     >
-      <div className="w-8 h-8 rounded-lg bg-[#EEF3EC] flex items-center justify-center flex-shrink-0 text-[#2F5233]">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          {icon}
-        </svg>
-      </div>
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-[#2A2420]">{title}</p>
-        <p className="text-xs text-[#8A8175] truncate">{subtitle}</p>
-      </div>
-      {onClick && (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B0A99B" strokeWidth="2" className="ml-auto flex-shrink-0">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-[#EEF3EC] flex items-center justify-center flex-shrink-0 text-[#2F5233]">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              {icon}
+            </svg>
+          </div>
+          <p className="text-xs font-semibold text-[#2A2420]">{title}</p>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B0A99B" strokeWidth="2" className="flex-shrink-0">
           <path d="M9 18l6-6-6-6" />
         </svg>
-      )}
+      </div>
+
+      <div className="space-y-1">
+        {loading && <p className="text-[11px] text-[#B0A99B]">Loading…</p>}
+        {!loading && items.length === 0 && (
+          <p className="text-[11px] text-[#B0A99B]">{emptyText}</p>
+        )}
+        {!loading &&
+          items.map((item, i) => (
+            <div key={i} className="min-w-0">
+              <p className="text-xs text-[#2A2420] truncate leading-tight">{item.primary}</p>
+              <p className="text-[10px] text-[#8A8175] truncate leading-tight">{item.secondary}</p>
+            </div>
+          ))}
+      </div>
     </button>
   );
 }

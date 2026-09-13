@@ -183,3 +183,50 @@ class MonthlyLedger(BaseModel):
 class LiveStockItem(BaseModel):
     crop: str
     available_kg: Decimal
+
+
+class VendorCreate(BaseModel):
+    name: str
+    phone: Optional[str] = None
+    category: Optional[str] = None
+
+
+class VendorOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    phone: Optional[str]
+    category: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PurchaseCreate(BaseModel):
+    vendor_id: uuid.UUID
+    item: str
+    quantity: Decimal
+    unit: Optional[str] = None
+    cost: Decimal
+
+
+class PurchaseStatusUpdate(BaseModel):
+    status: str  # pending | paid | cancelled
+
+
+class PurchaseOut(BaseModel):
+    id: uuid.UUID
+    item: str
+    quantity: Decimal
+    unit: Optional[str]
+    cost: Decimal
+    status: str
+    created_at: datetime
+    vendor: VendorOut
+
+    class Config:
+        from_attributes = True
+
+
+class VendorDetail(VendorOut):
+    purchases: list[PurchaseOut] = []

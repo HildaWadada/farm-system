@@ -107,6 +107,33 @@ CREATE INDEX idx_orders_status ON orders(status);
 CREATE INDEX idx_orders_buyer ON orders(buyer_id);
 
 -- ─────────────────────────────────────────────
+-- Vendors and Purchases: mirrors Buyers/Orders, but for what the farm buys
+-- (fertilizer, chemicals, equipment, seedlings) rather than what it sells.
+-- ─────────────────────────────────────────────
+CREATE TABLE vendors (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        TEXT NOT NULL,
+    phone       TEXT,
+    category    TEXT,                                    -- e.g. "Agrovet", "Equipment", "Seedlings"
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE purchases (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor_id   UUID NOT NULL REFERENCES vendors(id),
+    item        TEXT NOT NULL,                            -- e.g. "NPK fertilizer", "Irrigation pipes"
+    quantity    NUMERIC(10,2) NOT NULL,
+    unit        TEXT,                                      -- e.g. "kg", "litres", "bags", "pieces"
+    cost        NUMERIC(12,2) NOT NULL,
+    status      order_status NOT NULL DEFAULT 'pending',
+    logged_by   UUID NOT NULL REFERENCES users(id),        -- always the supervisor
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_purchases_created_at ON purchases(created_at DESC);
+CREATE INDEX idx_purchases_vendor ON purchases(vendor_id);
+
+-- ─────────────────────────────────────────────
 -- Convenience view: live stock per crop = total harvested minus total sold (non-cancelled)
 -- ─────────────────────────────────────────────
 CREATE VIEW live_stock AS

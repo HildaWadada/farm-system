@@ -29,6 +29,7 @@ export default function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"open" | "resolved">("open");
 
   useEffect(() => {
     if (!ready || !token) return;
@@ -62,6 +63,8 @@ export default function AlertsPage() {
   if (!ready) return null;
 
   const backHref = role === "owner" ? "/dashboard" : "/home";
+  const openCount = alerts.filter((a) => a.status === "open").length;
+  const filteredAlerts = alerts.filter((a) => a.status === statusFilter);
 
   return (
     <div className="min-h-screen bg-[#FBF8F2] pb-8">
@@ -75,13 +78,50 @@ export default function AlertsPage() {
       </div>
 
       <div className="px-4 pt-4">
+        {/* Open / Resolved tabs — resolving an alert here moves it out of the default view */}
+        <div className="flex gap-1.5 mb-4">
+          <button
+            onClick={() => setStatusFilter("open")}
+            className={`text-xs font-medium rounded-full px-3 py-1.5 flex items-center gap-1.5 border transition-colors ${
+              statusFilter === "open"
+                ? "bg-forest text-white border-forest"
+                : "bg-white text-[#5C554A] border-[#E2DACB]"
+            }`}
+          >
+            Open
+            {openCount > 0 && (
+              <span
+                className={`text-[10px] w-4 h-4 rounded-full flex items-center justify-center ${
+                  statusFilter === "open" ? "bg-white/25 text-white" : "bg-[#FDECEC] text-[#B3261E]"
+                }`}
+              >
+                {openCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setStatusFilter("resolved")}
+            className={`text-xs font-medium rounded-full px-3 py-1.5 border transition-colors ${
+              statusFilter === "resolved"
+                ? "bg-forest text-white border-forest"
+                : "bg-white text-[#5C554A] border-[#E2DACB]"
+            }`}
+          >
+            Resolved
+          </button>
+        </div>
+
         {loading && <p className="text-sm text-[#8A8175]">Loading…</p>}
-        {!loading && alerts.length === 0 && (
-          <p className="text-sm text-[#8A8175]">No alerts. Everything's running smoothly.</p>
+        {!loading && filteredAlerts.length === 0 && (
+          <p className="text-sm text-[#8A8175]">
+            {statusFilter === "open"
+              ? "No open alerts — everything's running smoothly."
+              : "No resolved alerts yet."}
+          </p>
         )}
 
         <div className="space-y-2">
-          {alerts.map((alert) => (
+          {filteredAlerts.map((alert) => (
             <div
               key={alert.id}
               className="bg-white rounded-xl border border-[#EDE7DA] p-3.5"

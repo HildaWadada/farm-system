@@ -379,3 +379,157 @@ export async function getMonthlyLedger(token: string, month?: string): Promise<M
 
   return res.json();
 }
+
+export async function forgotPassword(email: string): Promise<{ message: string }> {
+  const res = await fetch(`${API_URL}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Something went wrong");
+  }
+
+  return res.json();
+}
+
+export async function resetPassword(
+  token: string,
+  newPassword: string
+): Promise<{ message: string }> {
+  const res = await fetch(`${API_URL}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not reset password");
+  }
+
+  return res.json();
+}
+
+export type Vendor = {
+  id: string;
+  name: string;
+  phone: string | null;
+  category: string | null;
+  created_at: string;
+};
+
+export async function createVendor(
+  token: string,
+  data: { name: string; phone?: string; category?: string }
+): Promise<Vendor> {
+  const res = await fetch(`${API_URL}/vendors`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not add vendor");
+  }
+
+  return res.json();
+}
+
+export async function listVendors(token: string): Promise<Vendor[]> {
+  const res = await fetch(`${API_URL}/vendors`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Could not load vendors");
+  }
+
+  return res.json();
+}
+
+export type VendorDetail = Vendor & { purchases: Purchase[] };
+
+export async function getVendor(token: string, vendorId: string): Promise<VendorDetail> {
+  const res = await fetch(`${API_URL}/vendors/${vendorId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Could not load vendor");
+  }
+
+  return res.json();
+}
+
+export type Purchase = {
+  id: string;
+  item: string;
+  quantity: string;
+  unit: string | null;
+  cost: string;
+  status: "pending" | "paid" | "cancelled";
+  created_at: string;
+  vendor: Vendor;
+};
+
+export async function createPurchase(
+  token: string,
+  data: { vendor_id: string; item: string; quantity: number; unit?: string; cost: number }
+): Promise<Purchase> {
+  const res = await fetch(`${API_URL}/purchases`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not save purchase");
+  }
+
+  return res.json();
+}
+
+export async function listPurchases(token: string): Promise<Purchase[]> {
+  const res = await fetch(`${API_URL}/purchases`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Could not load purchases");
+  }
+
+  return res.json();
+}
+
+export async function updatePurchaseStatus(
+  token: string,
+  purchaseId: string,
+  newStatus: "pending" | "paid" | "cancelled"
+): Promise<Purchase> {
+  const res = await fetch(`${API_URL}/purchases/${purchaseId}/status`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ status: newStatus }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not update purchase");
+  }
+
+  return res.json();
+}

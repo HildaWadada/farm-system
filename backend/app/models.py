@@ -130,3 +130,29 @@ class Order(Base):
     @property
     def total_amount(self):
         return self.price + self.logistics_fee + self.tax
+
+
+class Vendor(Base):
+    __tablename__ = "vendors"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    phone = Column(String, nullable=True)
+    category = Column(String, nullable=True)  # e.g. "Agrovet", "Equipment", "Seedlings"
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Purchase(Base):
+    __tablename__ = "purchases"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    vendor_id = Column(UUID(as_uuid=True), ForeignKey("vendors.id"), nullable=False)
+    item = Column(String, nullable=False)  # e.g. "NPK fertilizer", "Irrigation pipes"
+    quantity = Column(Numeric(10, 2), nullable=False)
+    unit = Column(String, nullable=True)  # e.g. "kg", "litres", "bags", "pieces"
+    cost = Column(Numeric(12, 2), nullable=False)
+    status = Column(Enum(OrderStatus, name="order_status"), nullable=False, default=OrderStatus.pending)
+    logged_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    vendor = relationship("Vendor")

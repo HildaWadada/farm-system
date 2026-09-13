@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.config import settings
-from app.models import User, Activity, Alert, AlertStatus, Worker, Buyer, Order, OrderStatus
+from app.models import User, Activity, Alert, AlertStatus, Worker, Buyer, Order, OrderStatus, Vendor, Purchase
 from app.schemas import (
     LoginRequest,
     LoginResponse,
@@ -36,6 +36,12 @@ from app.schemas import (
     LiveStockItem,
     MonthlyLedger,
     MonthlyLedgerCrop,
+    VendorCreate,
+    VendorOut,
+    VendorDetail,
+    PurchaseCreate,
+    PurchaseOut,
+    PurchaseStatusUpdate,
 )
 from app.auth import (
     verify_password,
@@ -487,3 +493,101 @@ def get_monthly_ledger(
         avg_order_value=avg_order_value,
         by_crop=by_crop,
     )
+
+
+@app.post("/vendors", response_model=VendorOut)
+def create_vendor(
+    payload: VendorCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    """Vendors are passive contact records, same as buyers — save once, reuse on every purchase."""
+    vendor = Vendor(name=payload.name, phone=payload.phone, category=payload.category)
+    db.add(vendor)
+    db.commit()
+    db.refresh(vendor)
+    return vendor
+
+
+@app.get("/vendors", response_model=List[VendorOut])
+def list_vendors(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return db.query(Vendor).order_by(Vendor.name).all()
+
+
+@app.get("/vendors/{vendor_id}", response_model=VendorDetail)
+def get_vendor(
+    vendor_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """A vendor's profile — their info plus every purchase logged against them."""
+    vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+    if not vendor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor not found")
+
+    purchases = (
+        db.query(Purchase)
+        .filter(Purchase.vendor_id == vendor_id)
+        .order_by(Purchase.created_at.desc())
+        .all()
+    )
+    return VendorDetail(
+        id=vendor.id,
+        name=vendor.name,
+        phone=vendor.phone,
+        category=vendor.category,
+        created_at=vendor.created_at,
+        purchases=purchases,
+    )
+
+
+@app.post("/purchases", response_model=PurchaseOut)
+def create_purchase(
+    payload: PurchaseCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    purchase = Purchase(
+        vendor_id=payload.vendor_id,
+        item=payload.item,
+        quantity=payload.quantity,
+        unit=payload.unit,
+        cost=payload.cost,
+        logged_by=current_user.id,
+    )
+    db.add(purchase)
+    db.commit()
+    db.refresh(purchase)
+    return purchase
+
+
+@app.get("/purchases", response_model=List[PurchaseOut])
+def list_purchases(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return (
+        db.query(Purchase)
+        .order_by(Purchase.created_at.desc())
+        .limit(50)
+        .all()
+    )
+
+
+@app.post("/purchases/{purchase_id}/status", response_model=PurchaseOut)
+def update_purchase_status(
+    purchase_id: str,
+    payload: PurchaseStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    purchase = db.query(Purchase).filter(Purchase.id == purchase_id).first()
+    if not purchase:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Purchase not found")
+    purchase.status = payload.status
+    db.commit()
+    db.refresh(purchase)
+    return purchase
