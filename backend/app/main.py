@@ -234,6 +234,13 @@ def create_activity(
     current_user: User = Depends(require_supervisor),
 ):
     """Only the supervisor can log activities — enforced by require_supervisor."""
+    photo_url = payload.photo_url if payload.activity_type == "issue" else None
+    if photo_url and len(photo_url) > 7_000_000:  # ~5MB image as base64, generous but bounded
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="That photo is too large. Try a smaller image.",
+        )
+
     activity = Activity(
         logged_by=current_user.id,
         worker_id=payload.worker_id,
@@ -243,6 +250,7 @@ def create_activity(
         crop_other=payload.crop_other if payload.crop == "other" else None,
         quantity_kg=payload.quantity_kg if payload.activity_type == "harvest" else None,
         notes=payload.notes,
+        photo_url=photo_url,
     )
     db.add(activity)
     db.commit()

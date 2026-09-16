@@ -200,6 +200,13 @@ export default function ActivityFeedPage() {
                         {item.notes && (
                           <p className="text-xs text-[#8A8175] mt-0.5">{item.notes}</p>
                         )}
+                        {item.photo_url && (
+                          <img
+                            src={item.photo_url}
+                            alt="Issue photo"
+                            className="w-16 h-16 object-cover rounded-lg border border-[#EDE7DA] mt-1.5"
+                          />
+                        )}
                       </div>
                     </div>
                     <span className="text-[11px] text-[#B0A99B] flex-shrink-0 whitespace-nowrap">

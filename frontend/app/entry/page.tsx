@@ -47,6 +47,54 @@ export default function EntryPage() {
   const [newWorkerRole, setNewWorkerRole] = useState("");
   const [savingWorker, setSavingWorker] = useState(false);
 
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [compressingPhoto, setCompressingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
+  function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoError(null);
+    setCompressingPhoto(true);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        // Resize so the longest side is at most 1000px, then compress to JPEG —
+        // keeps a phone photo well under a megabyte before it's sent as base64.
+        const maxSide = 1000;
+        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          setPhotoError("Could not process that photo.");
+          setCompressingPhoto(false);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        setPhotoPreview(dataUrl);
+        setCompressingPhoto(false);
+      };
+      img.onerror = () => {
+        setPhotoError("Could not read that image.");
+        setCompressingPhoto(false);
+      };
+      img.src = reader.result as string;
+    };
+    reader.onerror = () => {
+      setPhotoError("Could not read that file.");
+      setCompressingPhoto(false);
+    };
+    reader.readAsDataURL(file);
+
+    // Allow re-selecting the same file later after removing it.
+    e.target.value = "";
+  }
+
   async function loadWorkers(t: string) {
     try {
       const items = await listWorkers(t);
@@ -109,12 +157,14 @@ export default function EntryPage() {
         worker_id: workerId || undefined,
         notes: notes || undefined,
         quantity_kg: activityType === "harvest" && quantityKg ? Number(quantityKg) : undefined,
+        photo_url: activityType === "issue" && photoPreview ? photoPreview : undefined,
       });
       setSuccess(true);
       setNotes("");
       setQuantityKg("");
       setCropOther("");
       setActivityTypeOther("");
+      setPhotoPreview(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save entry");
     } finally {
@@ -303,6 +353,43 @@ export default function EntryPage() {
                 className="w-full rounded-lg border border-[#E2DACB] px-3 py-2 text-sm
                            focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest"
               />
+
+              <p className="text-xs font-medium text-[#5C554A] mb-1.5 mt-3">Photo (optional)</p>
+              {!photoPreview ? (
+                <label className="flex items-center justify-center gap-2 border border-dashed border-[#C9C2B2] rounded-lg py-3 text-xs text-[#5C554A] cursor-pointer hover:bg-[#FBF8F2] transition-colors">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                  {compressingPhoto ? "Processing…" : "Take or choose a photo"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handlePhotoSelect}
+                    className="hidden"
+                    disabled={compressingPhoto}
+                  />
+                </label>
+              ) : (
+                <div className="relative inline-block">
+                  <img
+                    src={photoPreview}
+                    alt="Issue photo preview"
+                    className="w-28 h-28 object-cover rounded-lg border border-[#E2DACB]"
+                  />
+                  <button
+                    onClick={() => setPhotoPreview(null)}
+                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-white border border-[#E2DACB] flex items-center justify-center text-[#5C554A] shadow-sm"
+                    aria-label="Remove photo"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              {photoError && <p className="text-[11px] text-[#B3261E] mt-1">{photoError}</p>}
             </div>
           )}
 
@@ -319,7 +406,7 @@ export default function EntryPage() {
 
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || compressingPhoto}
             className="w-full bg-forest text-white text-sm font-medium rounded-lg py-2.5
                        hover:bg-forestDark transition-colors disabled:opacity-60"
           >

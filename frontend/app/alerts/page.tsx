@@ -144,6 +144,13 @@ export default function AlertsPage() {
                       {alert.activity.worker ? ` — ${alert.activity.worker.name}` : ""} ·{" "}
                       {timeAgo(alert.created_at)}
                     </p>
+                    {alert.activity.photo_url && (
+                      <img
+                        src={alert.activity.photo_url}
+                        alt="Issue photo"
+                        className="w-20 h-20 object-cover rounded-lg border border-[#EDE7DA] mt-2"
+                      />
+                    )}
                   </div>
                 </div>
                 <span

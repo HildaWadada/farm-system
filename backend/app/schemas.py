@@ -71,6 +71,7 @@ class ActivityCreate(BaseModel):
     worker_id: Optional[uuid.UUID] = None
     quantity_kg: Optional[Decimal] = None  # only meaningful when activity_type == "harvest"
     notes: Optional[str] = None
+    photo_url: Optional[str] = None  # base64 data URI; only meaningful when activity_type == "issue"
 
 
 class ActivityOut(BaseModel):
@@ -82,6 +83,7 @@ class ActivityOut(BaseModel):
     block: Optional[str]
     quantity_kg: Optional[Decimal]
     notes: Optional[str]
+    photo_url: Optional[str] = None
     created_at: datetime
     worker: Optional[WorkerOut] = None
 

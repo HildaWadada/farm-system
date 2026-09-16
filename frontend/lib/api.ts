@@ -40,6 +40,7 @@ export type Activity = {
   block: string | null;
   quantity_kg: string | null;
   notes: string | null;
+  photo_url: string | null;
   created_at: string;
   worker: Worker | null;
 };
@@ -101,6 +102,7 @@ export async function createActivity(
     worker_id?: string;
     quantity_kg?: number;
     notes?: string;
+    photo_url?: string;
   }
 ): Promise<Activity> {
   const res = await fetch(`${API_URL}/activities`, {
