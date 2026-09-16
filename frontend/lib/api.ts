@@ -122,6 +122,37 @@ export async function createActivity(
   return res.json();
 }
 
+export async function updateActivity(
+  token: string,
+  activityId: string,
+  data: {
+    activity_type: string;
+    activity_type_other?: string;
+    crop: string;
+    crop_other?: string;
+    worker_id?: string;
+    quantity_kg?: number;
+    notes?: string;
+    photo_url?: string;
+  }
+): Promise<Activity> {
+  const res = await fetch(`${API_URL}/activities/${activityId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not update entry");
+  }
+
+  return res.json();
+}
+
 export async function listActivities(token: string): Promise<Activity[]> {
   const res = await fetch(`${API_URL}/activities`, {
     headers: { Authorization: `Bearer ${token}` },

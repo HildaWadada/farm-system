@@ -21,6 +21,7 @@ from app.schemas import (
     MessageResponse,
     UserOut,
     ActivityCreate,
+    ActivityUpdate,
     ActivityOut,
     AlertOut,
     HomeSummary,
@@ -54,10 +55,14 @@ from app.email import send_password_reset_email
 
 app = FastAPI(title="Farm Platform API")
 
-# Update allow_origins with your actual frontend URL(s) before deploying
+# Always allow local dev; add the real deployed frontend URL from settings too.
+allowed_origins = {"http://localhost:3000"}
+if settings.frontend_url:
+    allowed_origins.add(settings.frontend_url.rstrip("/"))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=list(allowed_origins),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -260,6 +265,62 @@ def create_activity(
     if activity.activity_type.value == "issue":
         alert = Alert(activity_id=activity.id, status=AlertStatus.open)
         db.add(alert)
+        db.commit()
+
+    return activity
+
+
+EDIT_WINDOW_HOURS = 24
+
+
+@app.patch("/activities/{activity_id}", response_model=ActivityOut)
+def update_activity(
+    activity_id: str,
+    payload: ActivityUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_supervisor),
+):
+    """Edits an existing entry — only within 24 hours of when it was created.
+    Applies the same rules as creating one (crop_other/activity_type_other only kept
+    when the matching field is 'other'; quantity only kept for harvest; photo only for issue)."""
+    activity = db.query(Activity).filter(Activity.id == activity_id).first()
+    if not activity:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+
+    age = datetime.now(timezone.utc) - activity.created_at
+    if age > timedelta(hours=EDIT_WINDOW_HOURS):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"This entry is more than {EDIT_WINDOW_HOURS} hours old and can no longer be edited.",
+        )
+
+    photo_url = payload.photo_url if payload.activity_type == "issue" else None
+    if photo_url and len(photo_url) > 7_000_000:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="That photo is too large. Try a smaller image.",
+        )
+
+    activity.worker_id = payload.worker_id
+    activity.activity_type = payload.activity_type
+    activity.activity_type_other = payload.activity_type_other if payload.activity_type == "other" else None
+    activity.crop = payload.crop
+    activity.crop_other = payload.crop_other if payload.crop == "other" else None
+    activity.quantity_kg = payload.quantity_kg if payload.activity_type == "harvest" else None
+    activity.notes = payload.notes
+    activity.photo_url = photo_url
+    db.commit()
+    db.refresh(activity)
+
+    # Keep the alert in sync: entry edited into an issue gets one; edited away from
+    # issue removes its open alert (a resolved one is left alone as history).
+    is_issue_now = activity.activity_type.value == "issue"
+    existing_alert = db.query(Alert).filter(Alert.activity_id == activity.id).first()
+    if is_issue_now and not existing_alert:
+        db.add(Alert(activity_id=activity.id, status=AlertStatus.open))
+        db.commit()
+    elif not is_issue_now and existing_alert and existing_alert.status == AlertStatus.open:
+        db.delete(existing_alert)
         db.commit()
 
     return activity

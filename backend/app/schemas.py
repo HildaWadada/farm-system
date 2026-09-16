@@ -74,6 +74,19 @@ class ActivityCreate(BaseModel):
     photo_url: Optional[str] = None  # base64 data URI; only meaningful when activity_type == "issue"
 
 
+class ActivityUpdate(BaseModel):
+    """Same shape as ActivityCreate — editing an entry replaces these fields wholesale.
+    Only allowed within 24 hours of the entry's created_at, enforced server-side."""
+    activity_type: str
+    activity_type_other: Optional[str] = None
+    crop: str
+    crop_other: Optional[str] = None
+    worker_id: Optional[uuid.UUID] = None
+    quantity_kg: Optional[Decimal] = None
+    notes: Optional[str] = None
+    photo_url: Optional[str] = None
+
+
 class ActivityOut(BaseModel):
     id: uuid.UUID
     activity_type: str
