@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireAuth } from "@/lib/useRequireAuth";
+import { CountUp } from "@/components/CountUp";
 import {
   getSummary,
   listActivities,
@@ -92,6 +93,7 @@ export default function HomePage() {
   const [openAlerts, setOpenAlerts] = useState<Alert[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     if (!ready || !token) return;
@@ -159,6 +161,47 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#FBF8F2] pb-20">
+      {/* Local keyframes — self-contained, no globals.css changes needed */}
+      <style jsx global>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in-up {
+          animation: fadeInUp 0.4s ease-out both;
+        }
+        @keyframes popIn {
+          from {
+            opacity: 0;
+            transform: scale(0.94);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .animate-pop-in {
+          animation: popIn 0.2s ease-out both;
+        }
+        @keyframes backdropFade {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        .animate-backdrop-fade {
+          animation: backdropFade 0.2s ease-out both;
+        }
+      `}</style>
+
       {/* Header */}
       <div className="bg-white border-b border-[#EDE7DA] px-4 py-3 flex items-center justify-between sticky top-0 z-10">
         <span className="font-semibold text-[#2A2420] text-sm tracking-wide">
@@ -168,36 +211,71 @@ export default function HomePage() {
           <button
             aria-label="Notifications"
             onClick={() => router.push("/alerts")}
-            className="text-[#5C554A]"
+            className="relative text-[#5C554A] hover:text-forest transition-colors"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 01-3.46 0" />
             </svg>
+            {openAlerts.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[#B3261E] animate-pulse" />
+            )}
           </button>
           <button
             aria-label="Log out"
-            onClick={logout}
-            className="w-7 h-7 rounded-full bg-[#2F5233] text-white text-xs flex items-center justify-center font-medium"
+            onClick={() => setShowLogoutConfirm(true)}
+            className="w-7 h-7 rounded-full bg-[#2F5233] text-white text-xs flex items-center justify-center font-medium transition-transform duration-150 active:scale-90"
           >
             {firstName.charAt(0).toUpperCase()}
           </button>
         </div>
       </div>
 
+      {/* Logout confirmation */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+          <div
+            className="absolute inset-0 bg-black/40 animate-backdrop-fade"
+            onClick={() => setShowLogoutConfirm(false)}
+          />
+          <div className="relative bg-white rounded-2xl border border-[#EDE7DA] shadow-xl p-5 w-full max-w-xs animate-pop-in">
+            <p className="text-sm font-semibold text-[#2A2420] mb-1">Log out?</p>
+            <p className="text-xs text-[#8A8175] mb-4">
+              You'll need to sign in again to keep logging field entries.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 text-sm font-medium text-[#5C554A] border border-[#E2DACB] rounded-lg py-2 hover:bg-[#FBF8F2] transition-all duration-150 active:scale-95"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={logout}
+                className="flex-1 text-sm font-medium text-white bg-[#B3261E] rounded-lg py-2 hover:bg-[#96201A] transition-all duration-150 active:scale-95"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="px-4 pt-4">
-        <p className="text-[11px] uppercase tracking-wide text-[#8A8175] font-medium">
-          Field operations
-        </p>
-        <h1 className="text-lg font-semibold text-[#2A2420] mt-0.5">
-          {greeting}, {firstName}
-        </h1>
+        <div className="animate-fade-in-up">
+          <p className="text-[11px] uppercase tracking-wide text-[#8A8175] font-medium">
+            Field operations
+          </p>
+          <h1 className="text-lg font-semibold text-[#2A2420] mt-0.5">
+            {greeting}, {firstName}
+          </h1>
+        </div>
 
         {/* Stat cards — same visual language as the owner's dashboard */}
-        <div className="grid grid-cols-3 gap-2 mt-4">
+        <div className="grid grid-cols-3 gap-2 mt-4 animate-fade-in-up" style={{ animationDelay: "60ms" }}>
           <button
             onClick={() => router.push("/activity")}
-            className="bg-white rounded-2xl border border-[#EDE7DA] p-3 flex flex-col items-start gap-2 text-left hover:border-forest/40 transition-colors"
+            className="bg-white rounded-2xl border border-[#EDE7DA] p-3 flex flex-col items-start gap-2 text-left transition-all duration-300 hover:border-forest/40 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
           >
             <div className="w-7 h-7 rounded-lg bg-[#EEF3EC] flex items-center justify-center text-forest">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -206,14 +284,14 @@ export default function HomePage() {
             </div>
             <div>
               <p className="text-lg font-semibold text-[#2A2420] leading-tight">
-                {loading ? "—" : summary?.today_entries ?? 0}
+                <CountUp value={loading ? null : summary?.today_entries ?? 0} />
               </p>
               <p className="text-[10px] text-[#8A8175] leading-tight">Today's entries</p>
             </div>
           </button>
           <button
             onClick={() => router.push("/alerts")}
-            className="bg-white rounded-2xl border border-[#EDE7DA] p-3 flex flex-col items-start gap-2 text-left hover:border-forest/40 transition-colors"
+            className="bg-white rounded-2xl border border-[#EDE7DA] p-3 flex flex-col items-start gap-2 text-left transition-all duration-300 hover:border-forest/40 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
           >
             <div className="w-7 h-7 rounded-lg bg-[#FDECEC] flex items-center justify-center text-[#B3261E]">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -222,13 +300,17 @@ export default function HomePage() {
               </svg>
             </div>
             <div>
-              <p className="text-lg font-semibold text-[#2A2420] leading-tight">
-                {loading ? "—" : summary?.active_alerts ?? 0}
+              <p
+                className={`text-lg font-semibold text-[#2A2420] leading-tight ${
+                  !loading && (summary?.active_alerts ?? 0) > 0 ? "animate-pulse" : ""
+                }`}
+              >
+                <CountUp value={loading ? null : summary?.active_alerts ?? 0} />
               </p>
               <p className="text-[10px] text-[#8A8175] leading-tight">Active alerts</p>
             </div>
           </button>
-          <div className="bg-white rounded-2xl border border-[#EDE7DA] p-3 flex flex-col items-start gap-2">
+          <div className="bg-white rounded-2xl border border-[#EDE7DA] p-3 flex flex-col items-start gap-2 transition-all duration-300 hover:shadow-md">
             <div className="w-7 h-7 rounded-lg bg-[#F1EFEA] flex items-center justify-center text-[#8A8175]">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
@@ -236,7 +318,7 @@ export default function HomePage() {
             </div>
             <div>
               <p className="text-lg font-semibold text-[#2A2420] leading-tight">
-                {loading ? "—" : summary?.pending_sync ?? 0}
+                <CountUp value={loading ? null : summary?.pending_sync ?? 0} />
               </p>
               <p className="text-[10px] text-[#8A8175] leading-tight">Pending sync</p>
             </div>
@@ -246,7 +328,8 @@ export default function HomePage() {
         {/* New field entry */}
         <button
           onClick={() => router.push("/entry")}
-          className="w-full mt-4 bg-[#2F5233] hover:bg-[#274429] transition-colors text-white text-sm font-medium rounded-xl py-3 flex items-center justify-center gap-2"
+          className="w-full mt-4 bg-[#2F5233] hover:bg-[#274429] transition-all duration-150 active:scale-[0.98] text-white text-sm font-medium rounded-xl py-3 flex items-center justify-center gap-2 animate-fade-in-up"
+          style={{ animationDelay: "100ms" }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M12 5v14M5 12h14" />
@@ -258,7 +341,7 @@ export default function HomePage() {
         <p className="text-[11px] uppercase tracking-wide text-[#8A8175] font-medium mt-6 mb-2">
           Quick access
         </p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 animate-fade-in-up" style={{ animationDelay: "140ms" }}>
           <PreviewCard
             title="Activity feed"
             onClick={() => router.push("/activity")}
@@ -341,11 +424,25 @@ export default function HomePage() {
           <p className="text-[11px] uppercase tracking-wide text-[#8A8175] font-medium">
             Recent activity
           </p>
-          <button onClick={() => router.push("/activity")} className="text-xs text-[#2F5233] font-medium">
+          <button onClick={() => router.push("/activity")} className="text-xs text-[#2F5233] font-medium group flex items-center gap-1">
             View all
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              className="transition-transform duration-200 group-hover:translate-x-0.5"
+            >
+              <path d="M9 18l6-6-6-6" />
+            </svg>
           </button>
         </div>
-        <div className="bg-white rounded-2xl border border-[#EDE7DA] overflow-hidden">
+        <div
+          className="bg-white rounded-2xl border border-[#EDE7DA] overflow-hidden animate-fade-in-up transition-all duration-300 hover:shadow-md"
+          style={{ animationDelay: "180ms" }}
+        >
           {loading && <p className="px-4 py-4 text-sm text-[#8A8175]">Loading…</p>}
           {!loading && recent.length === 0 && (
             <p className="px-4 py-4 text-sm text-[#8A8175]">No activity logged yet.</p>
@@ -367,8 +464,12 @@ export default function HomePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {recent.map((a) => (
-                    <tr key={a.id} className="border-b border-[#EDE7DA] last:border-b-0">
+                  {recent.map((a, i) => (
+                    <tr
+                      key={a.id}
+                      className="border-b border-[#EDE7DA] last:border-b-0 animate-fade-in-up"
+                      style={{ animationDelay: `${220 + i * 40}ms` }}
+                    >
                       <td className="px-4 py-2.5 text-sm text-[#2A2420]">
                         <span className="flex items-center gap-2">
                           <span
@@ -428,7 +529,7 @@ function PreviewCard({
   return (
     <button
       onClick={onClick}
-      className="bg-white rounded-2xl border border-[#EDE7DA] p-3 text-left hover:border-forest/40 transition-colors flex flex-col"
+      className="bg-white rounded-2xl border border-[#EDE7DA] p-3 text-left flex flex-col transition-all duration-300 hover:border-forest/40 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
     >
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
@@ -473,7 +574,7 @@ function NavItem({
   children: React.ReactNode;
 }) {
   return (
-    <button onClick={onClick} className="flex flex-col items-center gap-1 px-4">
+    <button onClick={onClick} className="flex flex-col items-center gap-1 px-4 transition-transform duration-150 active:scale-90">
       <svg
         width="20"
         height="20"

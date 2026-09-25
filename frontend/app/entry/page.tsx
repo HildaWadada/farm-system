@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireAuth } from "@/lib/useRequireAuth";
 import { createActivity, listWorkers, createWorker, Worker } from "@/lib/api";
+import { CustomSelect } from "@/components/CustomSelect";
 
 const CROPS = [
   { value: "dragon_fruit", label: "Dragon fruit" },
@@ -110,6 +111,14 @@ export default function EntryPage() {
     }
   }, [ready, token]);
 
+  // Auto-dismiss the "Entry saved" message after a few seconds instead of
+  // leaving it sitting there until the next save.
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => setSuccess(false), 3000);
+    return () => clearTimeout(timer);
+  }, [success]);
+
   async function handleAddWorker() {
     if (!token || !newWorkerName.trim()) return;
     setSavingWorker(true);
@@ -183,14 +192,44 @@ export default function EntryPage() {
       />
       <div className="fixed inset-0 -z-10 bg-black/40" />
 
+      {/* Local keyframes — self-contained, no globals.css changes needed */}
+      <style jsx global>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in-up {
+          animation: fadeInUp 0.4s ease-out both;
+        }
+        @keyframes popIn {
+          from {
+            opacity: 0;
+            transform: scale(0.92);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .animate-pop-in {
+          animation: popIn 0.25s ease-out both;
+        }
+      `}</style>
+
       <div className="px-4 py-6">
         <div className="max-w-md mx-auto">
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center justify-between mb-5 animate-fade-in-up">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push("/home")}
                 aria-label="Back to dashboard"
-                className="w-8 h-8 rounded-full bg-white/90 border border-white/50 flex items-center justify-center text-[#2A2420] hover:bg-white transition-colors shadow-sm"
+                className="w-8 h-8 rounded-full bg-white/90 border border-white/50 flex items-center justify-center text-[#2A2420] hover:bg-white transition-all duration-150 active:scale-90 shadow-sm"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M15 18l-6-6 6-6" />
@@ -204,14 +243,14 @@ export default function EntryPage() {
           </div>
 
           {/* Entry form */}
-          <div className="bg-white rounded-2xl border border-[#EDE7DA] p-4 shadow-lg mb-6">
+          <div className="bg-white rounded-2xl border border-[#EDE7DA] p-4 shadow-lg mb-6 animate-fade-in-up" style={{ animationDelay: "60ms" }}>
             <p className="text-xs font-medium text-[#5C554A] mb-2">Crop</p>
             <div className={`grid grid-cols-3 gap-2 ${crop === "other" ? "mb-2" : "mb-4"}`}>
               {CROPS.map((c) => (
                 <button
                   key={c.value}
                   onClick={() => setCrop(c.value)}
-                  className={`text-sm rounded-lg py-2 border transition-colors ${
+                  className={`text-sm rounded-lg py-2 border transition-all duration-150 active:scale-95 ${
                     crop === c.value
                       ? "bg-[#EAF2EA] border-forest text-forest"
                       : "border-[#E2DACB] text-[#5C554A]"
@@ -241,7 +280,7 @@ export default function EntryPage() {
                   <button
                     key={a.value}
                     onClick={() => setActivityType(a.value)}
-                    className={`text-xs rounded-lg py-2.5 border transition-colors ${
+                    className={`text-xs rounded-lg py-2.5 border transition-all duration-150 active:scale-95 ${
                       selected
                         ? isHarvest
                           ? "bg-[#EAF2EA] border-forest text-forest"
@@ -270,29 +309,28 @@ export default function EntryPage() {
             <p className="text-xs font-medium text-[#5C554A] mb-1.5">Worker</p>
             {!showAddWorker ? (
               <div className="flex gap-2 mb-4">
-                <select
+                <CustomSelect
                   value={workerId}
-                  onChange={(e) => setWorkerId(e.target.value)}
-                  className="flex-1 rounded-lg border border-[#E2DACB] px-3 py-2 text-sm bg-white
-                             focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest"
-                >
-                  <option value="">No worker selected</option>
-                  {workers.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                      {w.role ? ` — ${w.role}` : ""}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setWorkerId}
+                  placeholder="No worker selected"
+                  className="flex-1"
+                  options={[
+                    { value: "", label: "No worker selected" },
+                    ...workers.map((w) => ({
+                      value: w.id,
+                      label: w.role ? `${w.name} — ${w.role}` : w.name,
+                    })),
+                  ]}
+                />
                 <button
                   onClick={() => setShowAddWorker(true)}
-                  className="text-xs font-medium text-forest border border-forest/30 rounded-lg px-3 whitespace-nowrap hover:bg-[#EAF2EA] transition-colors"
+                  className="text-xs font-medium text-forest border border-forest/30 rounded-lg px-3 whitespace-nowrap hover:bg-[#EAF2EA] transition-all duration-150 active:scale-95"
                 >
                   + Add worker
                 </button>
               </div>
             ) : (
-              <div className="border border-[#E2DACB] rounded-lg p-3 mb-4 space-y-2 bg-[#FBF8F2]">
+              <div className="border border-[#E2DACB] rounded-lg p-3 mb-4 space-y-2 bg-[#FBF8F2] animate-fade-in-up">
                 <input
                   value={newWorkerName}
                   onChange={(e) => setNewWorkerName(e.target.value)}
@@ -318,7 +356,7 @@ export default function EntryPage() {
                   <button
                     onClick={handleAddWorker}
                     disabled={savingWorker || !newWorkerName.trim()}
-                    className="flex-1 bg-forest text-white text-xs font-medium rounded-lg py-2 hover:bg-forestDark transition-colors disabled:opacity-60"
+                    className="flex-1 bg-forest text-white text-xs font-medium rounded-lg py-2 hover:bg-forestDark transition-all duration-150 active:scale-95 disabled:opacity-60 disabled:active:scale-100"
                   >
                     {savingWorker ? "Saving…" : "Save worker"}
                   </button>
@@ -380,7 +418,7 @@ export default function EntryPage() {
                     />
                   </label>
                 ) : (
-                  <div className="relative inline-block">
+                  <div className="relative inline-block animate-pop-in">
                     <img
                       src={photoPreview}
                       alt="Issue photo preview"
@@ -402,12 +440,12 @@ export default function EntryPage() {
             )}
 
             {error && (
-              <p className="text-xs text-[#B3261E] bg-[#FDECEC] border border-[#F6D2D0] rounded-lg px-3 py-2 mb-3">
+              <p className="text-xs text-[#B3261E] bg-[#FDECEC] border border-[#F6D2D0] rounded-lg px-3 py-2 mb-3 animate-fade-in-up">
                 {error}
               </p>
             )}
             {success && (
-              <p className="text-xs text-forest bg-[#EAF2EA] border border-[#CFE3CF] rounded-lg px-3 py-2 mb-3">
+              <p className="text-xs text-forest bg-[#EAF2EA] border border-[#CFE3CF] rounded-lg px-3 py-2 mb-3 animate-fade-in-up">
                 Entry saved.
               </p>
             )}
@@ -416,7 +454,7 @@ export default function EntryPage() {
               onClick={handleSave}
               disabled={saving || compressingPhoto}
               className="w-full bg-forest text-white text-sm font-medium rounded-lg py-2.5
-                         hover:bg-forestDark transition-colors disabled:opacity-60"
+                         hover:bg-forestDark transition-all duration-150 active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100"
             >
               {saving ? "Saving…" : "Save entry"}
             </button>
