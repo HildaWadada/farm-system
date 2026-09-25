@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireAuth } from "@/lib/useRequireAuth";
+import { CountUp } from "@/components/CountUp";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -206,10 +207,27 @@ export default function OwnerDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#F4F1EA] flex">
+      {/* Local keyframes — no changes needed to globals.css */}
+      <style jsx global>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in-up {
+          animation: fadeInUp 0.45s ease-out both;
+        }
+      `}</style>
+
       {/* Sidebar */}
       <aside className="w-56 bg-white border-r border-[#EDE7DA] flex flex-col fixed top-0 bottom-0 left-0">
         <div className="px-5 py-5 flex items-center gap-2 border-b border-[#EDE7DA]">
-          <span className="font-semibold text-[#2A2420] text-sm">CLIFF'S FARM</span>
+          <span className="font-bold text-[#2A2420] text-sm">CLIFF'S FARM</span>
         </div>
 
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
@@ -217,9 +235,9 @@ export default function OwnerDashboardPage() {
             <button
               key={item.label}
               onClick={() => router.push(item.href)}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 hover:translate-x-0.5 ${
                 item.active
-                  ? "bg-[#EAF2EA] text-forest font-medium"
+                  ? "bg-[#EAF2EA] text-forest"
                   : "text-[#5C554A] hover:bg-[#FBF8F2]"
               }`}
             >
@@ -234,7 +252,7 @@ export default function OwnerDashboardPage() {
         <div className="border-t border-[#EDE7DA] px-2 py-3 space-y-0.5">
           <button
             onClick={() => router.push("/settings/password")}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-[#5C554A] hover:bg-[#FBF8F2] transition-colors"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-bold text-[#5C554A] hover:bg-[#FBF8F2] transition-all duration-200 hover:translate-x-0.5"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="3" />
@@ -244,7 +262,7 @@ export default function OwnerDashboardPage() {
           </button>
           <button
             onClick={logout}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-[#B3261E] hover:bg-[#FDECEC] transition-colors"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-bold text-[#B3261E] hover:bg-[#FDECEC] transition-all duration-200 hover:translate-x-0.5"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
@@ -269,16 +287,16 @@ export default function OwnerDashboardPage() {
               <input
                 placeholder="Search farm records…"
                 className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-[#E2DACB] bg-[#FBF8F2] w-56
-                           focus:outline-none focus:ring-2 focus:ring-forest/20 focus:border-forest"
+                           focus:outline-none focus:ring-2 focus:ring-forest/20 focus:border-forest transition-shadow"
               />
             </div>
-            <button onClick={() => router.push("/alerts")} className="relative text-[#5C554A]">
+            <button onClick={() => router.push("/alerts")} className="relative text-[#5C554A] hover:text-forest transition-colors">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
                 <path d="M13.73 21a2 2 0 01-3.46 0" />
               </svg>
               {openAlerts.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#B3261E] text-white text-[8px] flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#B3261E] text-white text-[8px] flex items-center justify-center animate-pulse">
                   {openAlerts.length}
                 </span>
               )}
@@ -297,16 +315,16 @@ export default function OwnerDashboardPage() {
 
         <div className="p-6">
           {/* Page heading */}
-          <div className="mb-6">
+          <div className="mb-6 animate-fade-in-up" style={{ animationDelay: "0ms" }}>
             <h1 className="text-lg font-semibold text-[#2A2420]">Farm overview</h1>
             <p className="text-xs text-[#8A8175] mt-0.5">Real-time operational summary for Cliff's Farm</p>
           </div>
 
           {/* KPI cards — real current figures, no fabricated trend deltas */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-4 gap-4 mb-6 animate-fade-in-up" style={{ animationDelay: "60ms" }}>
             <KpiCard
               label="Active orders"
-              value={loading ? "—" : String(activeOrders.length)}
+              value={loading ? null : activeOrders.length}
               onClick={() => router.push("/orders")}
               icon={
                 <>
@@ -317,19 +335,19 @@ export default function OwnerDashboardPage() {
             />
             <KpiCard
               label="Live stock (kg)"
-              value={loading ? "—" : totalStockKg.toFixed(0)}
+              value={loading ? null : Math.round(totalStockKg)}
               onClick={() => router.push("/orders")}
               icon={<path d="M20 12V8H6a2 2 0 010-4h12v4M4 6v14a2 2 0 002 2h14v-4M18 12a2 2 0 100 4 2 2 0 000-4z" />}
             />
             <KpiCard
               label="Pending orders"
-              value={loading ? "—" : String(pendingOrders.length)}
+              value={loading ? null : pendingOrders.length}
               onClick={() => router.push("/orders")}
               icon={<path d="M12 8v4l3 3M12 22a10 10 0 100-20 10 10 0 000 20z" />}
             />
             <KpiCard
               label="Active workers"
-              value={loading ? "—" : String(workers.length)}
+              value={loading ? null : workers.length}
               onClick={() => router.push("/workers")}
               icon={
                 <>
@@ -341,9 +359,9 @@ export default function OwnerDashboardPage() {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-3 gap-4 mb-6 animate-fade-in-up" style={{ animationDelay: "120ms" }}>
             {/* Critical alerts */}
-            <div className="bg-white rounded-2xl border border-[#EDE7DA] p-4">
+            <div className="bg-white rounded-2xl border border-[#EDE7DA] p-4 transition-all duration-300 hover:shadow-md">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm font-semibold text-[#2A2420] flex items-center gap-1.5">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B3261E" strokeWidth="2">
@@ -353,7 +371,7 @@ export default function OwnerDashboardPage() {
                   Critical alerts
                 </p>
                 {openAlerts.length > 0 && (
-                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#FDECEC] text-[#B3261E]">
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#FDECEC] text-[#B3261E] animate-pulse">
                     {openAlerts.length} Active
                   </span>
                 )}
@@ -364,8 +382,12 @@ export default function OwnerDashboardPage() {
                 <p className="text-xs text-[#8A8175]">No open alerts — all clear.</p>
               )}
               <div className="space-y-3">
-                {openAlerts.slice(0, 3).map((a) => (
-                  <div key={a.id} className="flex items-start gap-2">
+                {openAlerts.slice(0, 3).map((a, i) => (
+                  <div
+                    key={a.id}
+                    className="flex items-start gap-2 animate-fade-in-up"
+                    style={{ animationDelay: `${160 + i * 60}ms` }}
+                  >
                     <span className="mt-1 w-1.5 h-1.5 rounded-full bg-[#B3261E] flex-shrink-0" />
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-[#2A2420] truncate">
@@ -380,17 +402,25 @@ export default function OwnerDashboardPage() {
               </div>
               <button
                 onClick={() => router.push("/alerts")}
-                className="text-xs text-forest font-medium mt-3 flex items-center gap-1"
+                className="text-xs text-forest font-medium mt-3 flex items-center gap-1 group"
               >
                 View all alerts
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  className="transition-transform duration-200 group-hover:translate-x-0.5"
+                >
                   <path d="M9 18l6-6-6-6" />
                 </svg>
               </button>
             </div>
 
             {/* Stock by crop */}
-            <div className="bg-white rounded-2xl border border-[#EDE7DA] p-4 col-span-2">
+            <div className="bg-white rounded-2xl border border-[#EDE7DA] p-4 col-span-2 transition-all duration-300 hover:shadow-md">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm font-semibold text-[#2A2420]">Stock by crop</p>
                 <button onClick={() => router.push("/orders")} className="text-xs text-forest font-medium">
@@ -406,7 +436,7 @@ export default function OwnerDashboardPage() {
                     <button
                       key={crop}
                       onClick={() => router.push("/orders")}
-                      className="border border-[#EDE7DA] rounded-xl p-3 text-left hover:border-forest/40 hover:shadow-sm transition-all"
+                      className="border border-[#EDE7DA] rounded-xl p-3 text-left transition-all duration-200 hover:border-forest/40 hover:shadow-sm hover:-translate-y-0.5"
                     >
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-medium text-[#2A2420]">{CROP_LABELS[crop]}</p>
@@ -418,7 +448,9 @@ export default function OwnerDashboardPage() {
                           {low ? "Low stock" : "In stock"}
                         </span>
                       </div>
-                      <p className="text-lg font-semibold text-forest mt-1">{kg.toFixed(0)} kg</p>
+                      <p className="text-lg font-semibold text-forest mt-1">
+                        <CountUp value={loading ? null : Math.round(kg)} /> kg
+                      </p>
                     </button>
                   );
                 })}
@@ -427,7 +459,10 @@ export default function OwnerDashboardPage() {
           </div>
 
           {/* Recent orders */}
-          <div className="bg-white rounded-2xl border border-[#EDE7DA] p-4">
+          <div
+            className="bg-white rounded-2xl border border-[#EDE7DA] p-4 animate-fade-in-up transition-all duration-300 hover:shadow-md"
+            style={{ animationDelay: "180ms" }}
+          >
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-sm font-semibold text-[#2A2420]">Recent orders</p>
@@ -436,7 +471,7 @@ export default function OwnerDashboardPage() {
               <button
                 onClick={() => downloadOrdersPdf(orders)}
                 disabled={orders.length === 0}
-                className="text-xs font-medium text-white bg-forest rounded-lg px-3 py-1.5 hover:bg-forestDark transition-colors disabled:opacity-50"
+                className="text-xs font-medium text-white bg-forest rounded-lg px-3 py-1.5 hover:bg-forestDark transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:active:scale-100"
               >
                 Download PDF
               </button>
@@ -454,15 +489,15 @@ export default function OwnerDashboardPage() {
                     <th className="py-2 text-[10px] uppercase tracking-wide text-[#8A8175] font-medium">Date</th>
                     <th className="py-2 text-[10px] uppercase tracking-wide text-[#8A8175] font-medium">Amount</th>
                     <th className="py-2 text-[10px] uppercase tracking-wide text-[#8A8175] font-medium">Status</th>
-                    <th className="py-2 text-[10px] uppercase tracking-wide text-[#8A8175] font-medium text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.slice(0, 6).map((o) => (
+                  {orders.slice(0, 6).map((o, i) => (
                     <tr
                       key={o.id}
                       onClick={() => router.push("/orders")}
-                      className="border-b border-[#EDE7DA] last:border-b-0 cursor-pointer hover:bg-[#FBF8F2] transition-colors"
+                      className="border-b border-[#EDE7DA] last:border-b-0 cursor-pointer hover:bg-[#FBF8F2] transition-colors animate-fade-in-up"
+                      style={{ animationDelay: `${220 + i * 40}ms` }}
                     >
                       <td className="py-2.5 text-xs text-[#2A2420] font-medium">{orderCode(o.id)}</td>
                       <td className="py-2.5 text-xs text-[#2A2420]">{o.buyer.name}</td>
@@ -472,21 +507,6 @@ export default function OwnerDashboardPage() {
                         <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full capitalize ${STATUS_STYLES[o.status]}`}>
                           {o.status}
                         </span>
-                      </td>
-                      <td className="py-2.5 text-right">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push("/orders");
-                          }}
-                          className="text-[#8A8175] hover:text-forest"
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <circle cx="12" cy="5" r="1" />
-                            <circle cx="12" cy="12" r="1" />
-                            <circle cx="12" cy="19" r="1" />
-                          </svg>
-                        </button>
                       </td>
                     </tr>
                   ))}
@@ -507,7 +527,7 @@ function KpiCard({
   onClick,
 }: {
   label: string;
-  value: string;
+  value: number | null;
   icon: React.ReactNode;
   onClick?: () => void;
 }) {
@@ -516,7 +536,8 @@ function KpiCard({
       onClick={onClick}
       disabled={!onClick}
       className="bg-white rounded-2xl border border-[#EDE7DA] p-4 flex items-center gap-3 text-left
-                 hover:border-forest/40 hover:shadow-sm transition-all disabled:hover:border-[#EDE7DA] disabled:hover:shadow-none"
+                 transition-all duration-300 hover:border-forest/40 hover:shadow-md hover:-translate-y-0.5
+                 disabled:hover:border-[#EDE7DA] disabled:hover:shadow-none disabled:hover:translate-y-0"
     >
       <div className="w-9 h-9 rounded-lg bg-[#EEF3EC] flex items-center justify-center flex-shrink-0 text-forest">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -524,7 +545,9 @@ function KpiCard({
         </svg>
       </div>
       <div>
-        <p className="text-lg font-semibold text-[#2A2420] leading-tight">{value}</p>
+        <p className="text-lg font-semibold text-[#2A2420] leading-tight">
+          <CountUp value={value} />
+        </p>
         <p className="text-[11px] text-[#8A8175]">{label}</p>
       </div>
     </button>
