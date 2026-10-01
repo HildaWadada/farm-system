@@ -20,6 +20,7 @@ import {
   Purchase,
   Alert,
 } from "@/lib/api";
+import { useOfflineSync } from "@/lib/useOfflineSync";
 
 const CROP_LABELS: Record<string, string> = {
   dragon_fruit: "Dragon fruit",
@@ -83,6 +84,7 @@ type PreviewItem = { primary: string; secondary: string };
 export default function HomePage() {
   const router = useRouter();
   const { ready, token, name, logout } = useRequireAuth("supervisor");
+  const { pendingCount, isOnline } = useOfflineSync(token);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [recent, setRecent] = useState<Activity[]>([]);
 
@@ -360,16 +362,22 @@ export default function HomePage() {
             </div>
           </button>
           <div className="bg-white rounded-2xl border border-[#EDE7DA] p-3 flex flex-col items-start gap-2 transition-all duration-300 hover:shadow-md">
-            <div className="w-7 h-7 rounded-lg bg-[#F1EFEA] flex items-center justify-center text-[#8A8175]">
+            <div
+              className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                pendingCount > 0 ? "bg-[#FFF4E0] text-[#8A5B00]" : "bg-[#F1EFEA] text-[#8A8175]"
+              }`}
+            >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
               </svg>
             </div>
             <div>
-              <p className="text-lg font-semibold text-[#2A2420] leading-tight">
-                <CountUp value={loading ? null : summary?.pending_sync ?? 0} />
+              <p className={`text-lg font-semibold leading-tight ${pendingCount > 0 ? "text-[#8A5B00]" : "text-[#2A2420]"}`}>
+                <CountUp value={pendingCount} />
               </p>
-              <p className="text-[10px] text-[#8A8175] leading-tight">Pending sync</p>
+              <p className="text-[10px] text-[#8A8175] leading-tight">
+                {!isOnline ? "Offline" : "Pending sync"}
+              </p>
             </div>
           </div>
         </div>

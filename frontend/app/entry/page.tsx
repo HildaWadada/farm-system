@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useRequireAuth } from "@/lib/useRequireAuth";
 import { createActivity, listWorkers, createWorker, Worker } from "@/lib/api";
 import { CustomSelect } from "@/components/CustomSelect";
+import { submitOrQueue } from "@/lib/offlineQueue";
+import { useOfflineSync } from "@/lib/useOfflineSync";
 
 const CROPS = [
   { value: "dragon_fruit", label: "Dragon fruit" },
@@ -39,6 +41,9 @@ export default function EntryPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [queued, setQueued] = useState(false);
+
+  const { pendingCount, isOnline } = useOfflineSync(token);
 
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [workerId, setWorkerId] = useState<string>("");
@@ -119,6 +124,12 @@ export default function EntryPage() {
     return () => clearTimeout(timer);
   }, [success]);
 
+  useEffect(() => {
+    if (!queued) return;
+    const timer = setTimeout(() => setQueued(false), 4000);
+    return () => clearTimeout(timer);
+  }, [queued]);
+
   async function handleAddWorker() {
     if (!token || !newWorkerName.trim()) return;
     setSavingWorker(true);
@@ -145,6 +156,7 @@ export default function EntryPage() {
     if (!token) return;
     setError(null);
     setSuccess(false);
+    setQueued(false);
 
     if (crop === "other" && !cropOther.trim()) {
       setError("Type the crop name for \"Other\".");
@@ -157,18 +169,24 @@ export default function EntryPage() {
 
     setSaving(true);
 
+    const payload = {
+      activity_type: activityType,
+      activity_type_other: activityType === "other" ? activityTypeOther.trim() : undefined,
+      crop,
+      crop_other: crop === "other" ? cropOther.trim() : undefined,
+      worker_id: workerId || undefined,
+      notes: notes || undefined,
+      quantity_kg: activityType === "harvest" && quantityKg ? Number(quantityKg) : undefined,
+      photo_url: activityType === "issue" && photoPreview ? photoPreview : undefined,
+    };
+
     try {
-      await createActivity(token, {
-        activity_type: activityType,
-        activity_type_other: activityType === "other" ? activityTypeOther.trim() : undefined,
-        crop,
-        crop_other: crop === "other" ? cropOther.trim() : undefined,
-        worker_id: workerId || undefined,
-        notes: notes || undefined,
-        quantity_kg: activityType === "harvest" && quantityKg ? Number(quantityKg) : undefined,
-        photo_url: activityType === "issue" && photoPreview ? photoPreview : undefined,
-      });
-      setSuccess(true);
+      const result = await submitOrQueue("activity", payload, (p) => createActivity(token, p));
+      if (result.status === "queued") {
+        setQueued(true);
+      } else {
+        setSuccess(true);
+      }
       setNotes("");
       setQuantityKg("");
       setCropOther("");
@@ -240,6 +258,13 @@ export default function EntryPage() {
                 <p className="text-xs text-white/90 drop-shadow">{name}</p>
               </div>
             </div>
+
+            {(!isOnline || pendingCount > 0) && (
+              <div className="flex items-center gap-1.5 bg-white/90 rounded-full px-2.5 py-1 text-[10px] font-medium text-[#8A5B00] shadow-sm">
+                <span className={`w-1.5 h-1.5 rounded-full ${!isOnline ? "bg-[#B3261E]" : "bg-[#8A5B00] animate-pulse"}`} />
+                {!isOnline ? "Offline" : `Syncing ${pendingCount}`}
+              </div>
+            )}
           </div>
 
           {/* Entry form */}
@@ -447,6 +472,11 @@ export default function EntryPage() {
             {success && (
               <p className="text-xs text-forest bg-[#EAF2EA] border border-[#CFE3CF] rounded-lg px-3 py-2 mb-3 animate-fade-in-up">
                 Entry saved.
+              </p>
+            )}
+            {queued && (
+              <p className="text-xs text-[#8A5B00] bg-[#FFF4E0] border border-[#F3DBA3] rounded-lg px-3 py-2 mb-3 animate-fade-in-up">
+                Saved on this device — will sync automatically once you're back online.
               </p>
             )}
 
