@@ -38,7 +38,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center px-4">
+    <div className="relative h-dvh overflow-hidden flex items-center justify-center px-4">
       {/* Background photo */}
       <div
         className="absolute inset-0 bg-cover bg-center"
