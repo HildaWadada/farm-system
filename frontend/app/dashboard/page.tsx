@@ -100,6 +100,7 @@ export default function OwnerDashboardPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     if (!ready || !token) return;
@@ -224,17 +225,41 @@ export default function OwnerDashboardPage() {
         }
       `}</style>
 
-      {/* Sidebar */}
-      <aside className="w-56 bg-white border-r border-[#EDE7DA] flex flex-col fixed top-0 bottom-0 left-0">
-        <div className="px-5 py-5 flex items-center gap-2 border-b border-[#EDE7DA]">
+      {/* Mobile backdrop — closes the drawer on tap outside it */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-30 md:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
+      {/* Sidebar — slides in as a drawer on mobile, always visible on desktop */}
+      <aside
+        className={`w-64 md:w-56 bg-white border-r border-[#EDE7DA] flex flex-col fixed top-0 bottom-0 left-0 z-40
+                    transform transition-transform duration-300 md:translate-x-0
+                    ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`}
+      >
+        <div className="px-5 py-5 flex items-center justify-between gap-2 border-b border-[#EDE7DA]">
           <span className="font-bold text-[#2A2420] text-sm">CLIFF'S FARM</span>
+          <button
+            onClick={() => setMobileNavOpen(false)}
+            aria-label="Close menu"
+            className="md:hidden text-[#8A8175] hover:text-[#2A2420] transition-colors"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => (
             <button
               key={item.label}
-              onClick={() => router.push(item.href)}
+              onClick={() => {
+                setMobileNavOpen(false);
+                router.push(item.href);
+              }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 hover:translate-x-0.5 ${
                 item.active
                   ? "bg-[#EAF2EA] text-forest"
@@ -274,19 +299,30 @@ export default function OwnerDashboardPage() {
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 ml-56">
+      <div className="flex-1 md:ml-56">
         {/* Top bar */}
-        <div className="bg-white border-b border-[#EDE7DA] px-6 py-3 flex items-center justify-between sticky top-0 z-10">
-          <p className="text-xs text-[#8A8175]">Dashboard</p>
-          <div className="flex items-center gap-4">
-            <div className="relative">
+        <div className="bg-white border-b border-[#EDE7DA] px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-20">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Open menu"
+              className="md:hidden text-[#5C554A] hover:text-forest transition-colors"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <p className="text-xs text-[#8A8175] hidden sm:block">Dashboard</p>
+          </div>
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="relative hidden sm:block">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B0A99B" strokeWidth="2" className="absolute left-3 top-1/2 -translate-y-1/2">
                 <circle cx="11" cy="11" r="8" />
                 <path d="M21 21l-4.35-4.35" />
               </svg>
               <input
                 placeholder="Search farm records…"
-                className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-[#E2DACB] bg-[#FBF8F2] w-56
+                className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-[#E2DACB] bg-[#FBF8F2] w-40 md:w-56
                            focus:outline-none focus:ring-2 focus:ring-forest/20 focus:border-forest transition-shadow"
               />
             </div>
@@ -313,7 +349,7 @@ export default function OwnerDashboardPage() {
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           {/* Page heading */}
           <div className="mb-6 animate-fade-in-up" style={{ animationDelay: "0ms" }}>
             <h1 className="text-lg font-semibold text-[#2A2420]">Farm overview</h1>
@@ -321,7 +357,7 @@ export default function OwnerDashboardPage() {
           </div>
 
           {/* KPI cards — real current figures, no fabricated trend deltas */}
-          <div className="grid grid-cols-4 gap-4 mb-6 animate-fade-in-up" style={{ animationDelay: "60ms" }}>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 animate-fade-in-up" style={{ animationDelay: "60ms" }}>
             <KpiCard
               label="Active orders"
               value={loading ? null : activeOrders.length}
@@ -359,7 +395,7 @@ export default function OwnerDashboardPage() {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mb-6 animate-fade-in-up" style={{ animationDelay: "120ms" }}>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 animate-fade-in-up" style={{ animationDelay: "120ms" }}>
             {/* Critical alerts */}
             <div className="bg-white rounded-2xl border border-[#EDE7DA] p-4 transition-all duration-300 hover:shadow-md">
               <div className="flex items-center justify-between mb-3">
@@ -420,7 +456,7 @@ export default function OwnerDashboardPage() {
             </div>
 
             {/* Stock by crop */}
-            <div className="bg-white rounded-2xl border border-[#EDE7DA] p-4 col-span-2 transition-all duration-300 hover:shadow-md">
+            <div className="bg-white rounded-2xl border border-[#EDE7DA] p-4 lg:col-span-2 transition-all duration-300 hover:shadow-md">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm font-semibold text-[#2A2420]">Stock by crop</p>
                 <button onClick={() => router.push("/orders")} className="text-xs text-forest font-medium">
@@ -481,7 +517,8 @@ export default function OwnerDashboardPage() {
             {!loading && orders.length === 0 && <p className="text-xs text-[#8A8175]">No orders yet.</p>}
 
             {!loading && orders.length > 0 && (
-              <table className="w-full text-left border-collapse">
+              <div className="overflow-x-auto -mx-4 px-4">
+              <table className="w-full text-left border-collapse min-w-[500px]">
                 <thead>
                   <tr className="border-b border-[#EDE7DA]">
                     <th className="py-2 text-[10px] uppercase tracking-wide text-[#8A8175] font-medium">Order ID</th>
@@ -512,6 +549,7 @@ export default function OwnerDashboardPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </div>
