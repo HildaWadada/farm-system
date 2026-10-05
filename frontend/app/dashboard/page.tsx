@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireAuth } from "@/lib/useRequireAuth";
 import { CountUp } from "@/components/CountUp";
+import { generateOrderReceipt } from "@/lib/receipt";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -526,6 +527,7 @@ export default function OwnerDashboardPage() {
                     <th className="py-2 text-[10px] uppercase tracking-wide text-[#8A8175] font-medium">Date</th>
                     <th className="py-2 text-[10px] uppercase tracking-wide text-[#8A8175] font-medium">Amount</th>
                     <th className="py-2 text-[10px] uppercase tracking-wide text-[#8A8175] font-medium">Status</th>
+                    <th className="py-2 text-[10px] uppercase tracking-wide text-[#8A8175] font-medium text-right">Receipt</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -544,6 +546,22 @@ export default function OwnerDashboardPage() {
                         <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full capitalize ${STATUS_STYLES[o.status]}`}>
                           {o.status}
                         </span>
+                      </td>
+                      <td className="py-2.5 text-right">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            generateOrderReceipt(o);
+                          }}
+                          className="text-[#8A8175] hover:text-forest transition-colors"
+                          aria-label="Download receipt"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                            <path d="M7 10l5 5 5-5" />
+                            <path d="M12 15V3" />
+                          </svg>
+                        </button>
                       </td>
                     </tr>
                   ))}
