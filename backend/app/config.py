@@ -12,6 +12,7 @@ class Settings(BaseSettings):
 
     at_username: str = "sandbox"
     at_api_key: str = ""
+    at_default_country_code: str = "+254"  # Kenya — used only for numbers typed without a country code
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
