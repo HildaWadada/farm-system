@@ -9,3 +9,4 @@ python-dotenv==1.0.1
 pydantic[email]==2.9.2
 pydantic-settings==2.5.2
 requests==2.32.3
+africastalking==1.2.9

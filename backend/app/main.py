@@ -52,6 +52,7 @@ from app.auth import (
     require_supervisor,
 )
 from app.email import send_password_reset_email
+from app.sms import send_order_sms
 
 app = FastAPI(title="Farm Platform API")
 
@@ -459,8 +460,10 @@ def create_order(
     it's a supervisor judgment call in the field — but the live-stock number is shown
     on the form so they can see it before saving.
 
-    notify_sms / notify_email are recorded as the supervisor's stated preference only —
-    no message is actually sent yet, since no SMS or email provider is connected."""
+    notify_email is recorded as the supervisor's stated preference only — no email
+    is actually sent yet, since no Resend domain is verified for sending to arbitrary
+    addresses. notify_sms, when checked and the buyer has a phone number on file,
+    triggers a real SMS via Africa's Talking."""
     order = Order(
         buyer_id=payload.buyer_id,
         crop=payload.crop,
@@ -475,8 +478,16 @@ def create_order(
     db.add(order)
     db.commit()
     db.refresh(order)
-    return order
 
+    if order.notify_sms and order.buyer.phone:
+        crop_label = order.crop.value if hasattr(order.crop, "value") else order.crop
+        message = (
+            f"Cliff's Farm: your order of {order.quantity_kg}kg {crop_label} "
+            f"has been confirmed. Total: KES {order.total_amount}. Thank you!"
+        )
+        send_order_sms(order.buyer.phone, message)
+
+    return order
 
 @app.get("/orders", response_model=List[OrderOut])
 def list_orders(

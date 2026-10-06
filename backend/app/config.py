@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     resend_api_key: str = ""
     frontend_url: str = "http://localhost:3000"
 
+    at_username: str = "sandbox"
+    at_api_key: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
