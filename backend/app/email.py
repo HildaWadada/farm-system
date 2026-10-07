@@ -54,7 +54,7 @@ def send_password_reset_email(to_email: str, reset_link: str) -> bool:
                 "to": [to_email],
                 "subject": "Reset your Farm Platform password",
                 "html": f"""
-                    <p>Someone requested a password reset for this account.</p>
+                    <p>You requested a password reset for this account.</p>
                     <p><a href="{reset_link}">Click here to set a new password</a></p>
                     <p>This link expires in 30 minutes. If you didn't request this, you can ignore this email.</p>
                 """,
