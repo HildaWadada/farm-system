@@ -2,10 +2,6 @@
 
 A simple system built around one idea: the supervisor logs everything that happens in the field, and the owner sees it instantly. One activity feed solves both the communication problem (issues become alerts immediately) and the sales problem (harvests become live stock, orders sell against it).
 
-**Live:**
-- Frontend: https://cliffs-farm.vercel.app
-- Backend API: https://farm-system-backend.onrender.com (see `/docs` for all endpoints)
-
 ## Who uses this
 
 | Role | Who | What they can do |
@@ -17,10 +13,11 @@ There is no public sign-up. Only two accounts exist, created once via `seed.py`.
 
 ## Tech stack
 
-- **Frontend:** Next.js 14 (App Router) + TypeScript + Tailwind CSS — deployed on Vercel
+- **Frontend:** Next.js 14 (App Router) + TypeScript + Tailwind CSS, font set to Poppins — deployed on Vercel
 - **Backend:** FastAPI + SQLAlchemy — deployed on Render
 - **Database:** PostgreSQL — hosted on Neon
 - **Email:** Resend (password reset emails)
+- **SMS:** Africa's Talking (order confirmation texts to buyers)
 
 ## Project structure
 
@@ -33,7 +30,9 @@ farm_system/
 │   │   ├── schemas.py       — request/response shapes (Pydantic)
 │   │   ├── auth.py          — login, JWT, password hashing
 │   │   ├── config.py        — reads .env
-│   │   └── database.py      — DB connection
+│   │   ├── database.py      — DB connection
+│   │   ├── email.py         — password reset emails via Resend (picks the right API key per recipient)
+│   │   └── sms.py           — order confirmation SMS via Africa's Talking
 │   ├── schema.sql           — full database schema (fresh installs)
 │   ├── migration_add_workers.sql
 │   ├── seed.py               — creates the owner + supervisor accounts
@@ -42,25 +41,29 @@ farm_system/
 │   └── .env                  — your local secrets (never commit this)
 └── frontend/
     ├── app/
+    │   ├── layout.tsx         — root layout, loads the Poppins font app-wide
     │   ├── login/             — sign in
     │   ├── change-password/   — forced on first login
     │   ├── settings/password/ — change password any time
     │   ├── forgot-password/   — request a reset email
     │   ├── reset-password/    — set new password via emailed link
     │   ├── home/              — supervisor's dashboard/landing page
-    │   ├── entry/              — new field entry form (supports photo attachment on issues)
+    │   ├── entry/              — new field entry form (photo attachment on issues, works offline)
     │   ├── activity/           — full live activity feed with filters
     │   ├── workers/            — worker list, add worker, worker profile (/workers/[id])
     │   ├── alerts/             — safety alerts, resolve issues
     │   ├── buyers/             — buyer contacts
-    │   ├── orders/             — log sales, view live stock, order history
-    │   └── dashboard/          — owner's read-only overview (KPIs, alerts, stock, recent orders)
+    │   ├── orders/             — log sales, view live stock, order history, download receipts
+    │   └── dashboard/          — owner's read-only overview (KPIs, alerts, stock, recent orders), mobile-responsive
     ├── components/
     │   ├── CountUp.tsx         — animated number count-up, used across dashboards
     │   └── CustomSelect.tsx    — styled dropdown (replaces native <select>)
     └── lib/
         ├── api.ts              — all backend calls
-        └── useRequireAuth.ts   — page access control
+        ├── useRequireAuth.ts   — page access control
+        ├── offlineQueue.ts     — local storage queue for submissions made while offline
+        ├── useOfflineSync.ts   — auto-retries the offline queue when connection returns
+        └── receipt.ts          — generates a single-order PDF receipt, shared by supervisor and owner views
 ```
 
 ## First-time setup (local development)
@@ -81,7 +84,7 @@ source .venv/Scripts/activate      # Windows Git Bash
 pip install -r requirements.txt
 ```
 
-Create `.env` in `backend/` (copy `.env.example` and fill in real values — `DATABASE_URL`, `JWT_SECRET`, `RESEND_API_KEY`, owner/supervisor seed values).
+Create `.env` in `backend/` (copy `.env.example` and fill in real values — `DATABASE_URL`, `JWT_SECRET`, Resend and Africa's Talking keys, owner/supervisor seed values).
 
 ```
 python seed.py
@@ -130,7 +133,7 @@ Free Postgres. Connection string goes into `DATABASE_URL` wherever the backend r
 - Build command: `pip install -r requirements.txt`
 - Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT` (no `--reload` in production)
 - Python version pinned via `runtime.txt` (`python-3.11.9`) and/or the `PYTHON_VERSION` environment variable — Render's default Python (3.14 at time of writing) doesn't have a pre-built wheel for `pydantic-core`, so it tries to compile from source and fails on Render's read-only build filesystem.
-- Environment variables: all values from `.env.example` (`DATABASE_URL`, `JWT_SECRET`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `OWNER_*`, `SUPERVISOR_*`, `RESEND_API_KEY`)
+- Environment variables: `DATABASE_URL`, `JWT_SECRET`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `FRONTEND_URL`, `OWNER_*`, `SUPERVISOR_*`, `RESEND_API_KEY_OWNER`, `RESEND_API_KEY_SUPERVISOR`, `OWNER_EMAIL`, `SUPERVISOR_EMAIL`, `AT_USERNAME`, `AT_API_KEY`, `AT_DEFAULT_COUNTRY_CODE`
 - Free tier spins down after ~15 min idle — first request after a quiet period takes 30–50s to wake up.
 
 ### Frontend — Vercel
@@ -139,15 +142,17 @@ Free Postgres. Connection string goes into `DATABASE_URL` wherever the backend r
 - Subdomain is editable under Project Settings → Domains
 
 ### After both are deployed
-Add the live Vercel URL to the backend's CORS allowed origins (in `main.py`) and redeploy the backend — otherwise the browser blocks requests from the deployed frontend to the deployed backend.
+Add the live Vercel URL to the backend's CORS allowed origins (via `FRONTEND_URL`) and redeploy the backend — otherwise the browser blocks requests from the deployed frontend to the deployed backend.
 
 ## Features
 
-**Home dashboard (supervisor)** — greeting, today's entry count, active alert count, quick access to every section below.
+**Home dashboard (supervisor)** — greeting, today's entry count, active alert count, a real "pending sync" count (see Offline support below), quick access to every section below.
 
-**Owner dashboard (`/dashboard`)** — read-only overview: active orders, live stock (kg), pending orders, active workers, critical alerts, stock by crop, recent orders with PDF export.
+**Owner dashboard (`/dashboard`)** — read-only overview: active orders, live stock (kg), pending orders, active workers, critical alerts, stock by crop, recent orders with PDF export and per-order receipt download. Mobile-responsive: sidebar becomes a slide-out drawer on phone.
 
 **New entry** — pick crop + activity (spray, weed, irrigate, fertilize, harvest, issue). Harvest asks for quantity in kg (feeds live stock). Issue asks for a description and optionally a photo (auto-creates an alert). Optionally attach a worker — saved workers appear in a dropdown so their details are never re-typed.
+
+**Offline support** — if a submission (entry, worker, buyer, order, or purchase) fails because there's no connection, it's saved on the device instead of lost, and automatically retried the moment the connection comes back — no action needed from the supervisor. The "Pending sync" count on the home dashboard reflects this queue in real time.
 
 **Activity feed (`/activity`)** — full log, grouped by day, filterable by crop and activity type, auto-refreshes every 15 seconds.
 
@@ -157,20 +162,25 @@ Add the live Vercel URL to the backend's CORS allowed origins (in `main.py`) and
 
 **Buyers (`/buyers`)** — passive contact records (name, phone). Buyers never log into the system themselves.
 
-**Orders (`/orders`)** — shows live stock available per crop (harvested − sold). Log a sale against a buyer; mark it paid or cancelled later.
+**Orders (`/orders`)** — shows live stock available per crop (harvested − sold). Log a sale against a buyer; mark it paid or cancelled later. Every saved order can generate a downloadable PDF receipt (buyer, crop, quantity, price breakdown, total) — available to both the supervisor and the owner.
 
-**Password reset** — supervisor or owner can request a reset email (via Resend) from the login screen, or change their password any time from account settings.
+**SMS notifications** — checking "Notify buyer by SMS" on an order sends the buyer a real text confirmation via Africa's Talking, once the buyer's phone number is on file.
+
+**Password reset** — supervisor or owner can request a reset email from the login screen, or change their password any time from account settings.
 
 ## Known limitations (by design, for now)
 
-- "Pending sync" on the home dashboard is a placeholder (always 0) — there's no offline mode built yet, so this number isn't live.
 - Activity feed shows the latest 50 entries only — fine for now, but will need pagination once activity volume grows.
 - Orders don't hard-block overselling past live stock — it's shown as a number, but the supervisor can still log a sale beyond it; this was a deliberate judgment-call decision, not a bug.
-- Resend's free tier only delivers to the email address used to sign up for Resend, since no domain is verified yet — password reset emails work for testing but not yet for arbitrary real addresses. Verifying a domain (~$10/year + DNS records) removes this limit.
+- Offline support has no service worker, so syncing only happens while the app is actually open — entries queued while offline sync the moment connection returns and the app is open, not silently in the background if it's fully closed.
+- Email notifications use two separate Resend accounts (one signed up with the owner's email, one with the supervisor's), since no domain is verified yet — this only covers these two specific people. Verifying a domain (~$10/year + DNS records) would let it send to any real address with one account.
+- SMS is on Africa's Talking's Sandbox tier — it doesn't deliver to real phones at all, only to their dashboard's virtual simulator. Reaching real buyer phones needs a Live app (funded account, approved sender ID) — see the SMS section in project notes for the exact steps when ready.
 
 ## Not yet built
 
 - "Manage users" screen for the owner (currently accounts can only be created via `seed.py`)
+- Email notifications beyond the two hardcoded accounts (needs a verified domain)
+- Real (non-Sandbox) SMS delivery (needs a Live Africa's Talking app)
 
 ## Useful commands
 
