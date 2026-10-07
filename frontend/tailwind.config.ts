@@ -9,6 +9,9 @@ const config: Config = {
         forest: "#2F5233",
         forestDark: "#274429",
       },
+      fontFamily: {
+        sans: ["var(--font-poppins)", "ui-sans-serif", "system-ui", "sans-serif"],
+      },
     },
   },
   plugins: [],
